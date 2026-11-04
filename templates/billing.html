@@ -29,7 +29,7 @@
             <button class="btn btn-outline-primary" id="btn-search-modal" type="button" title="Product Search (F4)">
                 <i class="bi bi-search"></i> Search [F4]
             </button>
-            <button class="btn btn-outline-secondary" id="btn-camera-modal" type="button" title="Camera Scanner">
+            <button class="btn btn-outline-secondary" id="btn-camera-modal" type="button" onclick="openCameraScanner()" data-bs-toggle="modal" data-bs-target="#cameraModal" title="Camera Scanner">
                 <i class="bi bi-camera"></i> Camera
             </button>
         </div>
@@ -210,18 +210,18 @@
 </div>
 
 <!-- Camera Scanner Modal -->
-<div class="modal fade" id="cameraModal" tabindex="-1">
+<div class="modal fade" id="cameraModal" tabindex="-1" aria-labelledby="cameraModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-navy text-white">
-                <h5 class="modal-title"><i class="bi bi-camera"></i> Camera Barcode Scanner</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="cameraModalLabel"><i class="bi bi-camera"></i> Camera Barcode Scanner</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="stopCameraScanner()"></button>
             </div>
             <div class="modal-body text-center p-3">
                 <div class="mb-2 d-flex justify-content-between align-items-center">
-                    <label class="form-label mb-0 fs-sm fw-bold"><i class="bi bi-camera-video"></i> Select Camera:</label>
+                    <label class="form-label mb-0 fs-sm fw-bold"><i class="bi bi-camera-video"></i> Camera:</label>
                     <select id="camera-select" class="form-select form-select-sm" style="max-width: 220px;" onchange="switchCamera(this.value)">
-                        <option value="">Detecting cameras...</option>
+                        <option value="">Default Camera</option>
                     </select>
                 </div>
                 <div style="position: relative; width: 100%; height: 280px; overflow: hidden; background: #000; border-radius: 8px;">
@@ -231,11 +231,22 @@
                     <div style="position: absolute; top: 50%; left: 8%; right: 8%; height: 2px; background: rgba(255, 0, 0, 0.85); box-shadow: 0 0 8px red; pointer-events: none;"></div>
                 </div>
                 <div id="camera-scan-status" class="mt-2 fs-sm text-muted">
-                    Align barcode inside the frame
+                    Point camera at item barcode
+                </div>
+
+                <!-- Snap Photo / Alternative Input Fallback -->
+                <div class="mt-3 pt-2 border-top d-flex justify-content-center gap-2">
+                    <input type="file" id="camera-file-input" accept="image/*" capture="environment" style="display: none;" onchange="handleBarcodeImageFile(this)">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('camera-file-input').click()">
+                        <i class="bi bi-camera-fill me-1"></i> Snap Photo / Upload Image
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="restartCamera()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Restart Camera
+                    </button>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="stopCameraScanner()">Close</button>
             </div>
         </div>
     </div>
@@ -614,10 +625,23 @@ document.getElementById('btn-clear-cart').addEventListener('click', () => {
 });
 
 // Search & Camera Modals
-const searchModal = new bootstrap.Modal(document.getElementById('searchModal'));
-const cameraModalEl = document.getElementById('cameraModal');
-const cameraModal = new bootstrap.Modal(cameraModalEl);
+function getCameraModal() {
+    const el = document.getElementById('cameraModal');
+    if (el && window.bootstrap && bootstrap.Modal) {
+        return bootstrap.Modal.getOrCreateInstance(el);
+    }
+    return null;
+}
 
+function getSearchModal() {
+    const el = document.getElementById('searchModal');
+    if (el && window.bootstrap && bootstrap.Modal) {
+        return bootstrap.Modal.getOrCreateInstance(el);
+    }
+    return null;
+}
+
+let isCameraRunning = false;
 let cameraStream = null;
 let nativeDetector = null;
 let scanAnimationId = null;
@@ -647,48 +671,64 @@ function playScanBeep() {
     }
 }
 
-// Camera button triggers the modal
-document.getElementById('btn-camera-modal').addEventListener('click', () => {
-    cameraModal.show();
-});
-
-// Start camera only after modal is fully rendered so video element has real dimensions
-cameraModalEl.addEventListener('shown.bs.modal', () => {
+// Open camera modal and begin scanning
+function openCameraScanner() {
+    const modal = getCameraModal();
+    if (modal) {
+        modal.show();
+    }
     startCameraScanner();
-});
+}
 
-// Stop camera hardware and release webcam when modal is closed
-cameraModalEl.addEventListener('hidden.bs.modal', () => {
+function restartCamera() {
     stopCameraScanner();
-});
+    const statusEl = document.getElementById('camera-scan-status');
+    if (statusEl) {
+        statusEl.className = 'mt-2 fs-sm text-primary';
+        statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Restarting camera...';
+    }
+    setTimeout(startCameraScanner, 250);
+}
 
 async function startCameraScanner() {
     const statusEl = document.getElementById('camera-scan-status');
     const video = document.getElementById('camera-preview');
-    statusEl.className = 'mt-2 fs-sm text-muted';
-    statusEl.innerText = 'Requesting camera access...';
+    if (!statusEl || !video) return;
 
-    // Verify secure context (HTTPS or localhost)
+    statusEl.className = 'mt-2 fs-sm text-primary';
+    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Starting camera...';
+
+    // Verify browser support for media devices
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         statusEl.className = 'mt-2 fs-sm text-danger';
-        statusEl.innerHTML = '<i class="bi bi-shield-exclamation text-danger"></i> Camera requires a secure connection (HTTPS or localhost). Please ensure the URL starts with <b>https://</b>.';
+        statusEl.innerHTML = '<i class="bi bi-shield-slash-fill text-danger"></i> Camera requires a secure connection (<b>https://</b> or <b>localhost</b>).';
         return;
     }
 
     try {
         stopCameraScanner();
 
-        // 1. Request camera stream (prefer back camera for barcodes)
-        const constraints = {
-            video: currentCameraDeviceId 
-                ? { deviceId: { exact: currentCameraDeviceId } }
-                : { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        };
+        // 1. Request camera stream (try back-camera first, then fallback to any camera)
+        let stream = null;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: currentCameraDeviceId 
+                    ? { deviceId: { exact: currentCameraDeviceId } }
+                    : { facingMode: { ideal: 'environment' } }
+            });
+        } catch (e1) {
+            console.warn('Constrained camera request failed, trying simple { video: true } fallback:', e1);
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
 
-        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = cameraStream;
+        cameraStream = stream;
+        video.srcObject = stream;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('autoplay', 'true');
+        video.muted = true;
         await video.play();
 
+        isCameraRunning = true;
         statusEl.className = 'mt-2 fs-sm text-success';
         statusEl.innerHTML = '<i class="bi bi-camera-video-fill"></i> Camera active. Aim at any barcode.';
 
@@ -698,17 +738,19 @@ async function startCameraScanner() {
         // 2. High-performance native BarcodeDetector API (built-in on Chrome/Edge/Android)
         if ('BarcodeDetector' in window) {
             try {
+                const supportedFormats = await BarcodeDetector.getSupportedFormats().catch(() => []);
                 nativeDetector = new BarcodeDetector({
-                    formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code']
+                    formats: supportedFormats.length ? supportedFormats : ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code']
                 });
                 startNativeScanLoop(video, statusEl);
                 return;
             } catch (err) {
                 console.warn('Native BarcodeDetector init failed, using ZXing:', err);
+                nativeDetector = null;
             }
         }
 
-        // 3. Fallback to ZXing library
+        // 3. Fallback to ZXing library decoding directly from the playing video element
         startZXingScanner(video, statusEl);
 
     } catch (err) {
@@ -719,7 +761,7 @@ async function startCameraScanner() {
         } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
             statusEl.innerHTML = '<i class="bi bi-camera-video-off"></i> No camera hardware detected on this device.';
         } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-            statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Camera is in use by another app (Zoom, Teams, Camera app). Please close it and retry.';
+            statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Camera is in use by another app (Zoom, Teams, Camera app). Please close other apps and click "Restart Camera".';
         } else {
             statusEl.innerText = 'Camera error: ' + (err.message || err.name || err);
         }
@@ -728,22 +770,18 @@ async function startCameraScanner() {
 
 function startNativeScanLoop(video, statusEl) {
     async function scanFrame() {
-        if (!cameraStream || video.readyState < 2) {
-            scanAnimationId = requestAnimationFrame(scanFrame);
-            return;
-        }
+        if (!isCameraRunning || !cameraStream) return;
 
-        try {
-            const barcodes = await nativeDetector.detect(video);
-            if (barcodes && barcodes.length > 0) {
-                const rawValue = barcodes[0].rawValue;
-                if (rawValue) {
-                    onBarcodeDetected(rawValue, statusEl);
+        if (video.readyState >= 2) {
+            try {
+                const barcodes = await nativeDetector.detect(video);
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                    onBarcodeDetected(barcodes[0].rawValue, statusEl);
                     return;
                 }
+            } catch (e) {
+                // Frame detection pass error, ignore and continue
             }
-        } catch (e) {
-            // Frame detection error, ignore and continue
         }
 
         scanAnimationId = requestAnimationFrame(scanFrame);
@@ -754,13 +792,19 @@ function startNativeScanLoop(video, statusEl) {
 function startZXingScanner(video, statusEl) {
     if (!window.ZXing) {
         statusEl.className = 'mt-2 fs-sm text-warning';
-        statusEl.innerText = 'Loading scanner library...';
+        statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Loading ZXing scanner...';
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
         script.onload = () => runZXing(video, statusEl);
         script.onerror = () => {
-            statusEl.className = 'mt-2 fs-sm text-danger';
-            statusEl.innerText = 'Could not load scanner library. Please check your internet connection.';
+            const s2 = document.createElement('script');
+            s2.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
+            s2.onload = () => runZXing(video, statusEl);
+            s2.onerror = () => {
+                statusEl.className = 'mt-2 fs-sm text-danger';
+                statusEl.innerText = 'Could not load scanner library. Please use "Snap Photo" below.';
+            };
+            document.head.appendChild(s2);
         };
         document.head.appendChild(script);
     } else {
@@ -773,9 +817,9 @@ function runZXing(video, statusEl) {
         if (!codeReader) {
             codeReader = new ZXing.BrowserMultiFormatReader();
         }
-        const selectedDeviceId = currentCameraDeviceId || undefined;
-        codeReader.decodeFromVideoDevice(selectedDeviceId, 'camera-preview', (result, err) => {
-            if (result) {
+        // Decode directly from the active video element
+        codeReader.decodeFromVideoElement(video, (result, err) => {
+            if (result && isCameraRunning) {
                 onBarcodeDetected(result.getText(), statusEl);
             }
         });
@@ -783,6 +827,67 @@ function runZXing(video, statusEl) {
         statusEl.className = 'mt-2 fs-sm text-danger';
         statusEl.innerText = 'ZXing error: ' + (e.message || e);
     }
+}
+
+// Fallback: snap photo with native device camera or upload image
+async function handleBarcodeImageFile(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const statusEl = document.getElementById('camera-scan-status');
+    statusEl.className = 'mt-2 fs-sm text-primary';
+    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Analyzing photo...';
+
+    try {
+        // Method A: Native BarcodeDetector
+        if ('BarcodeDetector' in window) {
+            const bitmap = await createImageBitmap(file);
+            const supported = await BarcodeDetector.getSupportedFormats().catch(() => []);
+            const detector = new BarcodeDetector({ formats: supported.length ? supported : ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'] });
+            const barcodes = await detector.detect(bitmap);
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                onBarcodeDetected(barcodes[0].rawValue, statusEl);
+                input.value = '';
+                return;
+            }
+        }
+
+        // Method B: ZXing image decode
+        if (!codeReader) {
+            if (!window.ZXing) {
+                await new Promise(r => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+                    s.onload = r;
+                    document.head.appendChild(s);
+                });
+            }
+            codeReader = new ZXing.BrowserMultiFormatReader();
+        }
+
+        const imgUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.src = imgUrl;
+        img.onload = async () => {
+            try {
+                const result = await codeReader.decodeFromImageElement(img);
+                URL.revokeObjectURL(imgUrl);
+                if (result) {
+                    onBarcodeDetected(result.getText(), statusEl);
+                } else {
+                    statusEl.className = 'mt-2 fs-sm text-warning';
+                    statusEl.innerText = 'No barcode detected in photo. Please snap a closer photo.';
+                }
+            } catch (err) {
+                URL.revokeObjectURL(imgUrl);
+                statusEl.className = 'mt-2 fs-sm text-warning';
+                statusEl.innerText = 'No barcode detected in photo. Make sure the barcode is in focus and well lit.';
+            }
+        };
+    } catch (e) {
+        statusEl.className = 'mt-2 fs-sm text-danger';
+        statusEl.innerText = 'Image scan error: ' + (e.message || e);
+    }
+    input.value = '';
 }
 
 function onBarcodeDetected(code, statusEl) {
@@ -802,7 +907,8 @@ function onBarcodeDetected(code, statusEl) {
     lookupBarcode(code);
 
     setTimeout(() => {
-        cameraModal.hide();
+        const modal = getCameraModal();
+        if (modal) modal.hide();
         stopCameraScanner();
     }, 400);
 }
@@ -813,14 +919,13 @@ function switchCamera(deviceId) {
 }
 
 function stopCameraScanner() {
+    isCameraRunning = false;
     if (scanAnimationId) {
         cancelAnimationFrame(scanAnimationId);
         scanAnimationId = null;
     }
     if (codeReader) {
-        try {
-            codeReader.reset();
-        } catch (e) {}
+        try { codeReader.reset(); } catch (e) {}
     }
     if (cameraStream) {
         cameraStream.getTracks().forEach(track => {
@@ -863,7 +968,8 @@ async function populateCameraDevices() {
 }
 
 document.getElementById('btn-search-modal').addEventListener('click', () => {
-    searchModal.show();
+    const modal = getSearchModal();
+    if (modal) modal.show();
     document.getElementById('modal-search-box').focus();
 });
 
