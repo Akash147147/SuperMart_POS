@@ -1,75 +1,167 @@
 {% extends "base.html" %}
 
-{% block title %}Hardware Settings - SuperMart POS{% endblock %}
+{% block title %}Hardware Configuration - SuperMart POS{% endblock %}
 
 {% block content %}
 <div class="page-header mb-3">
-    <h4><i class="bi bi-gear-wide-connected"></i> Hardware Configuration & Testing</h4>
+    <h4><i class="bi bi-gear-wide-connected"></i> Scanner & Hardware Configuration Center</h4>
+</div>
+
+<!-- Scanner Mode Selector Banner -->
+<div class="card-section p-3 mb-4 bg-white border-start border-4 border-primary">
+    <div class="row align-items-center">
+        <div class="col-md-7">
+            <h5 class="mb-1"><i class="bi bi-upc-scan text-primary"></i> Active Scanner Mode for Billing</h5>
+            <p class="text-muted fs-sm mb-0">Select your preferred scanner connection method. This setting will automatically control how the billing counter receives and processes barcodes.</p>
+        </div>
+        <div class="col-md-5">
+            <div class="input-group">
+                <span class="input-group-text bg-light"><i class="bi bi-check-circle text-success"></i></span>
+                <select class="form-select fw-bold" id="active-scanner-mode" onchange="saveActiveScannerMode(this.value)">
+                    <option value="keyboard">1. USB / Bluetooth Keyboard Emulation (Plug & Play)</option>
+                    <option value="webhid">2. Direct USB Scanner (WebHID API)</option>
+                    <option value="serial">3. RS232 / USB Virtual COM (Web Serial API)</option>
+                    <option value="bluetooth">4. Direct Wireless Bluetooth (Web Bluetooth API)</option>
+                    <option value="camera">5. Live Camera / Webcam Barcode Reader</option>
+                </select>
+            </div>
+            <div id="scanner-mode-feedback" class="fs-sm text-success mt-1" style="display:none;">Saved!</div>
+        </div>
+    </div>
 </div>
 
 <div class="row g-3">
-    <!-- WebHID Direct Hardware Scanner Card -->
+    <!-- Option 1: Standard Keyboard Emulation -->
     <div class="col-md-6">
-        <div class="card-section p-3">
-            <h5 class="mb-3"><i class="bi bi-usb-symbol text-primary"></i> Direct USB Scanner (WebHID Connect)</h5>
-            <p class="text-muted fs-sm">
-                Connect your USB barcode scanner directly through Chrome/Edge using the <strong>WebHID API</strong>.
-                Click <strong>"Pair USB Scanner"</strong>, select your scanner from the browser prompt, and it will be directly bound to this website.
-            </p>
-            <div class="d-flex gap-2 mb-3">
-                <button class="btn btn-primary btn-sm" id="btn-pair-hid" onclick="connectWebHIDScanner()">
-                    <i class="bi bi-link-45deg"></i> Pair USB Scanner
-                </button>
-                <span id="hid-status" class="badge bg-secondary align-self-center py-2 px-3">Not Connected</span>
+        <div class="card-section p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold m-0"><i class="bi bi-keyboard text-primary"></i> 1. USB Keyboard Emulation (Default)</h6>
+                <span class="badge bg-success">Recommended</span>
             </div>
-            <div id="hid-device-info" class="fs-sm text-muted mb-2"></div>
+            <p class="text-muted fs-sm">
+                Compatible with 99% of retail handheld scanners (Honeywell, Zebra, TVS, Datalogic, generic). No drivers or pairing needed.
+            </p>
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label fs-sm">Suffix Character</label>
+                    <select class="form-select form-select-sm" id="scanner-suffix" onchange="saveScannerConfig()">
+                        <option value="enter">Enter Key (Default)</option>
+                        <option value="tab">Tab Key</option>
+                        <option value="none">None (Auto Delay)</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label fs-sm">Prefix Trim</label>
+                    <input type="text" class="form-control form-control-sm" id="scanner-prefix" placeholder="Optional" onchange="saveScannerConfig()">
+                </div>
+            </div>
+            <div class="alert alert-light border fs-sm py-2 px-3 mb-0">
+                <i class="bi bi-info-circle text-primary"></i> <strong>Tip:</strong> Simply plug the USB cable in. Ensure your scanner's manual has the "CR/Enter Suffix" barcode scanned.
+            </div>
         </div>
     </div>
 
-    <!-- Web Bluetooth Direct Scanner Card -->
+    <!-- Option 2: WebHID Direct USB Connection -->
     <div class="col-md-6">
-        <div class="card-section p-3">
-            <h5 class="mb-3"><i class="bi bi-bluetooth text-info"></i> Direct Wireless Scanner (Web Bluetooth)</h5>
-            <p class="text-muted fs-sm">
-                Pair wireless Bluetooth barcode scanners directly through the browser without needing third-party drivers or dongles.
-            </p>
-            <div class="d-flex gap-2 mb-3">
-                <button class="btn btn-info text-white btn-sm" id="btn-pair-ble" onclick="connectBluetoothScanner()">
-                    <i class="bi bi-bluetooth"></i> Pair Bluetooth Scanner
-                </button>
-                <span id="ble-status" class="badge bg-secondary align-self-center py-2 px-3">Not Connected</span>
+        <div class="card-section p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold m-0"><i class="bi bi-usb-symbol text-primary"></i> 2. Direct USB Scanner (WebHID)</h6>
+                <span id="hid-status" class="badge bg-secondary">Not Connected</span>
             </div>
-            <div id="ble-device-info" class="fs-sm text-muted mb-2"></div>
+            <p class="text-muted fs-sm">
+                Directly connect USB scanners through Chrome/Edge. Barcodes are captured even if the cursor is not in the text box.
+            </p>
+            <div class="d-flex gap-2 mb-2">
+                <button class="btn btn-outline-primary btn-sm" id="btn-pair-hid" onclick="connectWebHIDScanner()">
+                    <i class="bi bi-link-45deg"></i> Connect USB Scanner
+                </button>
+                <button class="btn btn-outline-danger btn-sm" id="btn-disconnect-hid" onclick="disconnectWebHIDScanner()" style="display:none;">
+                    Disconnect
+                </button>
+            </div>
+            <div id="hid-device-info" class="fs-sm text-muted">Click connect to select a USB scanner.</div>
         </div>
     </div>
 
-    <!-- Scanner Test Card -->
+    <!-- Option 3: Web Serial / Virtual COM Port -->
     <div class="col-md-6">
+        <div class="card-section p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold m-0"><i class="bi bi-cpu text-warning"></i> 3. Serial / COM Port Scanner (Web Serial)</h6>
+                <span id="serial-status" class="badge bg-secondary">Not Connected</span>
+            </div>
+            <p class="text-muted fs-sm">
+                Connect industrial RS232 or USB-Serial virtual COM port scanners directly through the browser.
+            </p>
+            <div class="row g-2 mb-2">
+                <div class="col-6">
+                    <label class="form-label fs-sm">Baud Rate</label>
+                    <select class="form-select form-select-sm" id="serial-baud">
+                        <option value="9600">9600</option>
+                        <option value="19200">19200</option>
+                        <option value="38400">38400</option>
+                        <option value="115200">115200</option>
+                    </select>
+                </div>
+                <div class="col-6 d-flex align-items-end">
+                    <button class="btn btn-outline-warning w-100 btn-sm text-dark" id="btn-pair-serial" onclick="connectWebSerialScanner()">
+                        <i class="bi bi-plug"></i> Select COM Port
+                    </button>
+                </div>
+            </div>
+            <div id="serial-device-info" class="fs-sm text-muted">Supports USB-to-RS232 adapters and POS scanner cradles.</div>
+        </div>
+    </div>
+
+    <!-- Option 4: Direct Web Bluetooth Connection -->
+    <div class="col-md-6">
+        <div class="card-section p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold m-0"><i class="bi bi-bluetooth text-info"></i> 4. Direct Wireless Bluetooth (Web Bluetooth)</h6>
+                <span id="ble-status" class="badge bg-secondary">Not Connected</span>
+            </div>
+            <p class="text-muted fs-sm">
+                Pair Bluetooth cordless handheld scanners directly to this website without needing a USB receiver dongle.
+            </p>
+            <div class="d-flex gap-2 mb-2">
+                <button class="btn btn-outline-info text-dark btn-sm" id="btn-pair-ble" onclick="connectBluetoothScanner()">
+                    <i class="bi bi-bluetooth"></i> Scan for Bluetooth Devices
+                </button>
+            </div>
+            <div id="ble-device-info" class="fs-sm text-muted">Requires Bluetooth enabled on your computer or laptop.</div>
+        </div>
+    </div>
+
+    <!-- Live Scanner Diagnostic & Test Bench -->
+    <div class="col-12">
         <div class="card-section p-3">
-            <h5 class="mb-3"><i class="bi bi-upc"></i> Barcode Scanner Test (Keyboard / HID)</h5>
-            <p class="text-muted fs-sm">Test standard plug-and-play USB, Wireless dongle, or Bluetooth keyboard-emulation barcode scanners.</p>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="m-0"><i class="bi bi-clipboard-pulse text-success"></i> Universal Scanner Live Test Bench</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearScannerTestLog()">Clear Log</button>
+            </div>
+            <p class="text-muted fs-sm">Test any connected scanner (USB, WebHID, Serial, Bluetooth, or Camera). Scan any barcode to see the decoded output in real time.</p>
             <div class="mb-3">
-                <input type="text" id="scanner-test-input" class="form-control form-control-lg" placeholder="Scan any barcode here...">
+                <input type="text" id="scanner-test-input" class="form-control form-control-lg" placeholder="Aim your scanner and pull the trigger..." autofocus autocomplete="off">
             </div>
-            <div id="scanner-test-log" class="p-2 border rounded bg-light" style="min-height: 100px; font-family: monospace;">
-                Ready for input...
+            <div id="scanner-test-log" class="p-3 border rounded bg-light" style="min-height: 120px; max-height: 200px; overflow-y: auto; font-family: monospace;">
+                <span class="text-muted">Ready for scanner input. Scan a barcode above...</span>
             </div>
         </div>
     </div>
 
     <!-- Thermal Printer Test Card -->
     <div class="col-md-6">
-        <div class="card-section p-3">
-            <h5 class="mb-3"><i class="bi bi-printer"></i> Thermal Receipt Printer</h5>
+        <div class="card-section p-3 h-100">
+            <h5 class="mb-2"><i class="bi bi-printer"></i> Thermal Receipt Printer</h5>
             <p class="text-muted fs-sm">Verify printer width, paper formatting, and connectivity.</p>
             <div class="mb-3">
-                <label class="form-label">Paper Width</label>
-                <select class="form-select" id="printer-width-select">
-                    <option value="80mm">80mm Thermal Paper</option>
-                    <option value="58mm">58mm Thermal Paper</option>
+                <label class="form-label fs-sm">Paper Width</label>
+                <select class="form-select form-select-sm" id="printer-width-select">
+                    <option value="80mm">80mm Thermal Paper (Standard)</option>
+                    <option value="58mm">58mm Thermal Paper (Compact)</option>
                 </select>
             </div>
-            <button class="btn btn-primary" onclick="testPrintReceipt()">
+            <button class="btn btn-primary btn-sm" onclick="testPrintReceipt()">
                 <i class="bi bi-file-earmark-text"></i> Print Test Receipt
             </button>
         </div>
@@ -82,11 +174,63 @@
 const testInput = document.getElementById('scanner-test-input');
 const testLog = document.getElementById('scanner-test-log');
 
-// WebHID Direct USB Pairing
+// Load saved scanner preferences
+document.addEventListener('DOMContentLoaded', () => {
+    const savedMode = localStorage.getItem('supermart_scanner_mode') || 'keyboard';
+    document.getElementById('active-scanner-mode').value = savedMode;
+
+    const savedSuffix = localStorage.getItem('supermart_scanner_suffix') || 'enter';
+    document.getElementById('scanner-suffix').value = savedSuffix;
+
+    const savedPrefix = localStorage.getItem('supermart_scanner_prefix') || '';
+    document.getElementById('scanner-prefix').value = savedPrefix;
+});
+
+function saveActiveScannerMode(mode) {
+    localStorage.setItem('supermart_scanner_mode', mode);
+    const fb = document.getElementById('scanner-mode-feedback');
+    fb.style.display = 'block';
+    setTimeout(() => { fb.style.display = 'none'; }, 2000);
+    appendLog(`Active scanner mode set to: <strong>${mode.toUpperCase()}</strong>`);
+}
+
+function saveScannerConfig() {
+    const suffix = document.getElementById('scanner-suffix').value;
+    const prefix = document.getElementById('scanner-prefix').value;
+    localStorage.setItem('supermart_scanner_suffix', suffix);
+    localStorage.setItem('supermart_scanner_prefix', prefix);
+    appendLog(`Scanner config updated: Suffix=${suffix}, Prefix="${prefix}"`);
+}
+
+function appendLog(html) {
+    if (testLog.innerHTML.includes('Ready for scanner input')) {
+        testLog.innerHTML = '';
+    }
+    testLog.innerHTML = `<div><span class="text-muted">[${new Date().toLocaleTimeString()}]</span> ${html}</div>` + testLog.innerHTML;
+}
+
+function clearScannerTestLog() {
+    testLog.innerHTML = '<span class="text-muted">Log cleared. Ready for input...</span>';
+}
+
+// 1. Keyboard Emulation Test
+testInput.addEventListener('keydown', function(e) {
+    const suffixMode = localStorage.getItem('supermart_scanner_suffix') || 'enter';
+    if ((suffixMode === 'enter' && e.key === 'Enter') || (suffixMode === 'tab' && e.key === 'Tab')) {
+        e.preventDefault();
+        const val = this.value.trim();
+        if (val) {
+            appendLog(`<span class="text-success fw-bold">[KEYBOARD/USB]</span> Scanned: <strong>${val}</strong> (${val.length} digits)`);
+            this.value = '';
+        }
+    }
+});
+
+// 2. WebHID Direct USB Pairing
 let connectedHidDevice = null;
 async function connectWebHIDScanner() {
     if (!('hid' in navigator)) {
-        alert('WebHID is not supported by your browser. Please use Google Chrome or Microsoft Edge.');
+        alert('WebHID is not supported by your browser. Please open in Google Chrome or Microsoft Edge.');
         return;
     }
     try {
@@ -94,24 +238,84 @@ async function connectWebHIDScanner() {
         if (devices.length > 0) {
             connectedHidDevice = devices[0];
             await connectedHidDevice.open();
-            document.getElementById('hid-status').className = 'badge bg-success align-self-center py-2 px-3';
+            document.getElementById('hid-status').className = 'badge bg-success';
             document.getElementById('hid-status').innerText = 'Connected';
-            document.getElementById('hid-device-info').innerHTML = `<strong>Device:</strong> ${connectedHidDevice.productName || 'USB Scanner'} (Vendor: ${connectedHidDevice.vendorId})`;
+            document.getElementById('hid-device-info').innerHTML = `<strong>Connected:</strong> ${connectedHidDevice.productName || 'USB Scanner'} (Vendor: ${connectedHidDevice.vendorId})`;
+            document.getElementById('btn-disconnect-hid').style.display = 'inline-block';
 
-            // Listen for input reports from scanner
+            appendLog(`<span class="text-primary fw-bold">[WebHID]</span> Connected to: ${connectedHidDevice.productName}`);
+
             connectedHidDevice.addEventListener('inputreport', (event) => {
-                const { data, device, reportId } = event;
+                const { data, device } = event;
                 const textDecoder = new TextDecoder('utf-8');
                 const raw = textDecoder.decode(data);
-                testLog.innerHTML = `<span class="text-primary">[WebHID Direct]</span> Raw data received from ${device.productName}: ${raw}<br>` + testLog.innerHTML;
+                appendLog(`<span class="text-primary fw-bold">[WebHID DATA]</span> ${raw}`);
             });
         }
     } catch (err) {
-        console.warn('HID connection cancelled or failed:', err);
+        console.warn('HID connection error:', err);
     }
 }
 
-// Web Bluetooth Direct Pairing
+async function disconnectWebHIDScanner() {
+    if (connectedHidDevice) {
+        await connectedHidDevice.close();
+        connectedHidDevice = null;
+        document.getElementById('hid-status').className = 'badge bg-secondary';
+        document.getElementById('hid-status').innerText = 'Not Connected';
+        document.getElementById('hid-device-info').innerText = 'Click connect to select a USB scanner.';
+        document.getElementById('btn-disconnect-hid').style.display = 'none';
+        appendLog('<span class="text-warning">[WebHID]</span> Disconnected from scanner.');
+    }
+}
+
+// 3. Web Serial / COM Port Scanner
+let serialPort = null;
+async function connectWebSerialScanner() {
+    if (!('serial' in navigator)) {
+        alert('Web Serial is not supported by your browser. Please use Google Chrome or Microsoft Edge.');
+        return;
+    }
+    try {
+        serialPort = await navigator.serial.requestPort();
+        const baud = parseInt(document.getElementById('serial-baud').value) || 9600;
+        await serialPort.open({ baudRate: baud });
+
+        document.getElementById('serial-status').className = 'badge bg-success';
+        document.getElementById('serial-status').innerText = 'Connected (COM)';
+        document.getElementById('serial-device-info').innerHTML = `<strong>Connected:</strong> COM Port at ${baud} Baud`;
+
+        appendLog(`<span class="text-warning fw-bold">[Web Serial]</span> Serial COM port opened at ${baud} Baud.`);
+
+        // Read serial stream
+        readSerialStream();
+    } catch (err) {
+        console.warn('Serial port error:', err);
+    }
+}
+
+async function readSerialStream() {
+    while (serialPort && serialPort.readable) {
+        const textDecoder = new TextDecoderStream();
+        const readableStreamClosed = serialPort.readable.pipeTo(textDecoder.writable);
+        const reader = textDecoder.readable.getReader();
+        try {
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (value) {
+                    appendLog(`<span class="text-warning fw-bold">[SERIAL DATA]</span> ${value.trim()}`);
+                }
+            }
+        } catch (error) {
+            console.error('Error reading serial stream:', error);
+        } finally {
+            reader.releaseLock();
+        }
+    }
+}
+
+// 4. Web Bluetooth Direct Pairing
 async function connectBluetoothScanner() {
     if (!('bluetooth' in navigator)) {
         alert('Web Bluetooth is not supported by your browser. Please use Chrome or Edge with Bluetooth enabled.');
@@ -122,24 +326,17 @@ async function connectBluetoothScanner() {
             acceptAllDevices: true,
             optionalServices: ['generic_access', 'human_interface_device']
         });
-        document.getElementById('ble-status').className = 'badge bg-success align-self-center py-2 px-3';
+        document.getElementById('ble-status').className = 'badge bg-success';
         document.getElementById('ble-status').innerText = 'Paired';
-        document.getElementById('ble-device-info').innerHTML = `<strong>Device:</strong> ${device.name || 'Bluetooth Scanner'} (ID: ${device.id.substring(0, 10)}...)`;
+        document.getElementById('ble-device-info').innerHTML = `<strong>Paired Device:</strong> ${device.name || 'Bluetooth Scanner'} (${device.id.substring(0, 8)}...)`;
+
+        appendLog(`<span class="text-info fw-bold">[Bluetooth]</span> Paired with device: ${device.name}`);
     } catch (err) {
-        console.warn('Bluetooth pairing cancelled or failed:', err);
+        console.warn('Bluetooth pairing error:', err);
     }
 }
 
-testInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        const val = this.value.trim();
-        if (val) {
-            testLog.innerHTML = `<span class="text-success">[SUCCESS]</span> Scanned: <strong>${val}</strong> (${val.length} chars) at ${new Date().toLocaleTimeString()}<br>` + testLog.innerHTML;
-            this.value = '';
-        }
-    }
-});
-
+// Print test receipt
 function testPrintReceipt() {
     const width = document.getElementById('printer-width-select').value;
     const printWin = window.open('', '_blank', 'width=350,height=500');
@@ -164,4 +361,3 @@ function testPrintReceipt() {
 }
 </script>
 {% endblock %}
-

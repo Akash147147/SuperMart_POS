@@ -9,6 +9,23 @@
         <div class="barcode-input-group">
             <i class="bi bi-upc-scan fs-4 text-navy"></i>
             <input type="text" id="barcode-input" placeholder="Scan barcode (Enter) or type code..." autofocus autocomplete="off">
+            
+            <!-- Scanner Connection Selector Dropdown -->
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle btn-sm" type="button" id="scannerModeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-gear"></i> <span id="current-scanner-label">USB HID</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="scannerModeDropdown" style="min-width: 260px;">
+                    <li><h6 class="dropdown-header">Switch Scanner Mode</h6></li>
+                    <li><button class="dropdown-item" type="button" onclick="selectScannerMode('keyboard', 'USB Keyboard (Default)')"><i class="bi bi-keyboard me-2"></i> USB / Wireless Dongle</button></li>
+                    <li><button class="dropdown-item" type="button" onclick="selectScannerMode('webhid', 'Direct WebHID')"><i class="bi bi-usb-symbol me-2"></i> Pair USB (WebHID)</button></li>
+                    <li><button class="dropdown-item" type="button" onclick="selectScannerMode('serial', 'Serial COM Port')"><i class="bi bi-cpu me-2"></i> Serial / COM Port</button></li>
+                    <li><button class="dropdown-item" type="button" onclick="selectScannerMode('bluetooth', 'Direct Bluetooth')"><i class="bi bi-bluetooth me-2"></i> Pair Bluetooth Scanner</button></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-primary" href="/hardware"><i class="bi bi-sliders me-2"></i> Scanner Diagnostics Center</a></li>
+                </ul>
+            </div>
+
             <button class="btn btn-outline-primary" id="btn-search-modal" type="button" title="Product Search (F4)">
                 <i class="bi bi-search"></i> Search [F4]
             </button>
@@ -262,6 +279,92 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.q
 
 const barcodeInput = document.getElementById('barcode-input');
 const cartTbody = document.getElementById('cart-tbody');
+
+// Scanner Mode Management inside Billing
+function selectScannerMode(mode, label) {
+    localStorage.setItem('supermart_scanner_mode', mode);
+    document.getElementById('current-scanner-label').innerText = label;
+    if (mode === 'webhid') {
+        connectBillingWebHID();
+    } else if (mode === 'serial') {
+        connectBillingSerial();
+    } else if (mode === 'bluetooth') {
+        connectBillingBluetooth();
+    } else {
+        barcodeInput.focus();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const mode = localStorage.getItem('supermart_scanner_mode') || 'keyboard';
+    const labelMap = {
+        'keyboard': 'USB HID',
+        'webhid': 'WebHID USB',
+        'serial': 'Serial COM',
+        'bluetooth': 'Bluetooth',
+        'camera': 'Camera'
+    };
+    if (document.getElementById('current-scanner-label')) {
+        document.getElementById('current-scanner-label').innerText = labelMap[mode] || 'USB HID';
+    }
+});
+
+async function connectBillingWebHID() {
+    if (!('hid' in navigator)) {
+        alert('WebHID not supported in this browser. Use Chrome or Edge.');
+        return;
+    }
+    try {
+        const devices = await navigator.hid.requestDevice({ filters: [] });
+        if (devices.length > 0) {
+            const dev = devices[0];
+            await dev.open();
+            alert(`USB Scanner connected: ${dev.productName || 'HID Scanner'}`);
+            dev.addEventListener('inputreport', (event) => {
+                const textDecoder = new TextDecoder('utf-8');
+                const raw = textDecoder.decode(event.data).trim();
+                if (raw) lookupBarcode(raw);
+            });
+        }
+    } catch (e) {
+        console.warn('HID error:', e);
+    }
+}
+
+async function connectBillingSerial() {
+    if (!('serial' in navigator)) {
+        alert('Web Serial not supported in this browser. Use Chrome or Edge.');
+        return;
+    }
+    try {
+        const port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        alert('Serial scanner connected on COM port.');
+        const textDecoder = new TextDecoderStream();
+        port.readable.pipeTo(textDecoder.writable);
+        const reader = textDecoder.readable.getReader();
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value && value.trim()) lookupBarcode(value.trim());
+        }
+    } catch (e) {
+        console.warn('Serial error:', e);
+    }
+}
+
+async function connectBillingBluetooth() {
+    if (!('bluetooth' in navigator)) {
+        alert('Web Bluetooth not supported in this browser. Use Chrome or Edge with Bluetooth on.');
+        return;
+    }
+    try {
+        const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
+        alert(`Bluetooth scanner paired: ${dev.name || 'Wireless Scanner'}`);
+    } catch (e) {
+        console.warn('Bluetooth error:', e);
+    }
+}
 
 barcodeInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
