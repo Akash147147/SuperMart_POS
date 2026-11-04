@@ -19,3 +19,4 @@ with app.app_context():
         init_database(app)
     except Exception as e:
         app.logger.warning(f"Database initialization: {e}")
+
