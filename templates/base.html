@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
     {% block styles %}{% endblock %}
+    {% block extra_css %}{% endblock %}
 
     <style>
         /* ===== Root Variables ===== */
@@ -534,5 +535,6 @@
     </script>
 
     {% block scripts %}{% endblock %}
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
