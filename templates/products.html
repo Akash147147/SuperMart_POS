@@ -235,18 +235,47 @@
                     <!-- Basic Info -->
                     <h6 class="text-primary mb-3"><i class="bi bi-info-circle me-1"></i>Basic Information</h6>
                     <div class="row g-3 mb-4">
-                        <div class="col-md-8">
+                        <div class="col-md-12">
                             <label for="productName" class="form-label">Product Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="productName" required maxlength="200"
-                                   placeholder="Enter product name">
+                                   placeholder="Enter product name (e.g. Britannia Good Day 100g)">
                             <div class="invalid-feedback">Product name is required.</div>
                         </div>
-                        <div class="col-md-4">
-                            <label for="productBarcode" class="form-label">Barcode</label>
-                            <input type="text" class="form-control" id="productBarcode" maxlength="50"
-                                   placeholder="Scan or enter barcode">
-                            <div class="invalid-feedback" id="barcodeFeedback">Invalid barcode.</div>
+
+                        <!-- Product Barcode Setting Section -->
+                        <div class="col-md-12">
+                            <div class="card border bg-light shadow-none p-3" style="border-radius: 10px;">
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+                                    <label for="productBarcode" class="form-label mb-0 fw-bold text-dark">
+                                        <i class="bi bi-upc-scan text-primary me-1"></i>Product Barcode
+                                    </label>
+                                    <span class="text-muted small">Choose an option below to set the barcode:</span>
+                                </div>
+
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-upc"></i></span>
+                                    <input type="text" class="form-control font-monospace fw-bold" id="productBarcode" maxlength="50"
+                                           placeholder="Enter barcode number or scan item..." autocomplete="off">
+                                    <button type="button" class="btn btn-outline-primary" id="btnScanBarcodeModal" title="Scan with camera">
+                                        <i class="bi bi-camera me-1"></i>Scan with Camera
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="btnAutoGenerateBarcode" title="Auto-generate valid EAN-13 barcode">
+                                        <i class="bi bi-magic me-1"></i>Auto Generate
+                                    </button>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                                    <div id="barcodeValidationMsg" class="small text-muted">
+                                        <i class="bi bi-info-circle me-1"></i>Type the numbers printed below barcode, scan with USB/Bluetooth scanner, or click <b>Scan with Camera</b>.
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1" id="barcodeBadges">
+                                        <span class="badge bg-secondary d-none" id="barcodeTypeBadge"></span>
+                                        <span class="badge bg-success d-none" id="barcodeAvailBadge"></span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
                         <div class="col-md-4">
                             <label for="productHsn" class="form-label">HSN Code</label>
                             <input type="text" class="form-control" id="productHsn" maxlength="20"
@@ -462,6 +491,48 @@
                     <i class="bi bi-upload me-1" id="importIcon"></i>
                     <span id="importBtnText">Import</span>
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Camera Barcode Scanner Modal for Product Form -->
+<div class="modal fade" id="productCameraModal" tabindex="-1" aria-labelledby="productCameraModalLabel" aria-hidden="true" style="z-index: 1070;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-navy text-white">
+                <h5 class="modal-title" id="productCameraModalLabel"><i class="bi bi-camera me-2"></i>Scan Product Barcode</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="stopProductCameraScanner()"></button>
+            </div>
+            <div class="modal-body text-center p-3">
+                <div class="mb-2 d-flex justify-content-between align-items-center">
+                    <label class="form-label mb-0 fs-sm fw-bold"><i class="bi bi-camera-video me-1"></i>Camera:</label>
+                    <select id="product-camera-select" class="form-select form-select-sm" style="max-width: 220px;" onchange="switchProductCamera(this.value)">
+                        <option value="">Default Camera</option>
+                    </select>
+                </div>
+                <div style="position: relative; width: 100%; height: 260px; overflow: hidden; background: #000; border-radius: 8px;">
+                    <video id="product-camera-preview" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    <!-- Targeting frame and red laser line -->
+                    <div style="position: absolute; top: 15%; bottom: 15%; left: 10%; right: 10%; border: 2px dashed rgba(40, 167, 69, 0.8); border-radius: 8px; pointer-events: none;"></div>
+                    <div style="position: absolute; top: 50%; left: 8%; right: 8%; height: 2px; background: rgba(255, 0, 0, 0.85); box-shadow: 0 0 8px red; pointer-events: none;"></div>
+                </div>
+                <div id="product-camera-status" class="mt-2 fs-sm text-muted">
+                    Point camera at the product barcode
+                </div>
+                <!-- Fallback Snap Photo / Upload Image -->
+                <div class="mt-3 pt-2 border-top d-flex justify-content-center gap-2">
+                    <input type="file" id="product-camera-file" accept="image/*" capture="environment" style="display: none;" onchange="handleProductBarcodeImage(this)">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('product-camera-file').click()">
+                        <i class="bi bi-camera-fill me-1"></i>Snap Photo / Upload
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="restartProductCamera()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Restart Camera
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="stopProductCameraScanner()">Cancel</button>
             </div>
         </div>
     </div>
@@ -786,6 +857,14 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('duplicateBarcodeAlert').classList.add('d-none');
         document.getElementById('productFormError').classList.add('d-none');
         document.getElementById('productBarcode').classList.remove('is-invalid');
+        const typeBadge = document.getElementById('barcodeTypeBadge');
+        if (typeBadge) typeBadge.classList.add('d-none');
+        const availBadge = document.getElementById('barcodeAvailBadge');
+        if (availBadge) availBadge.classList.add('d-none');
+        const validationMsg = document.getElementById('barcodeValidationMsg');
+        if (validationMsg) {
+            validationMsg.innerHTML = '<i class="bi bi-info-circle me-1"></i>Type the numbers printed below barcode, scan with USB/Bluetooth scanner, or click <b>Scan with Camera</b>.';
+        }
     }
 
     // ==========================================
@@ -818,6 +897,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('productMinStock').value = p.min_stock_level || '10';
                     document.getElementById('productSoldByWeight').checked = p.sold_by_weight || false;
                     document.getElementById('productGstExempt').checked = p.is_gst_exempt || false;
+
+                    if (p.barcode) {
+                        checkBarcodeAvailability(p.barcode);
+                    }
 
                     productModal.show();
                 } else {
@@ -923,36 +1006,461 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ==========================================
-    // Check Duplicate Barcode on Blur
+    // Barcode Management: Format Detection, Audio Beep, Live Availability Check
     // ==========================================
-    document.getElementById('productBarcode').addEventListener('blur', function() {
-        const barcode = this.value.trim();
+    let barcodeCheckTimeout = null;
+
+    function playScanBeep() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.value = 1400;
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.12);
+        } catch (e) {}
+    }
+
+    function validateEanChecksum(code) {
+        if (!/^\d{13}$/.test(code)) return false;
+        const digits = code.split('').map(Number);
+        let sum = 0;
+        for (let i = 0; i < 12; i++) {
+            sum += digits[i] * (i % 2 === 0 ? 1 : 3);
+        }
+        const check = (10 - (sum % 10)) % 10;
+        return check === digits[12];
+    }
+
+    function detectBarcodeType(code) {
+        if (!code) return null;
+        if (/^\d{13}$/.test(code)) {
+            const isValid = validateEanChecksum(code);
+            return {
+                type: 'EAN-13',
+                valid: isValid,
+                badgeClass: isValid ? 'bg-primary' : 'bg-warning text-dark',
+                label: isValid ? 'EAN-13' : 'EAN-13 (Check digit warning)'
+            };
+        }
+        if (/^\d{12}$/.test(code)) {
+            return { type: 'UPC-A', valid: true, badgeClass: 'bg-info text-dark', label: 'UPC-A' };
+        }
+        if (/^\d{8}$/.test(code)) {
+            return { type: 'EAN-8', valid: true, badgeClass: 'bg-primary', label: 'EAN-8' };
+        }
+        if (/^[A-Za-z0-9\-_./]+$/.test(code)) {
+            return { type: 'Code-128', valid: true, badgeClass: 'bg-secondary', label: 'Code-128 / Custom' };
+        }
+        return { type: 'Custom', valid: true, badgeClass: 'bg-secondary', label: 'Custom' };
+    }
+
+    function checkBarcodeAvailability(code) {
+        const typeBadge = document.getElementById('barcodeTypeBadge');
+        const availBadge = document.getElementById('barcodeAvailBadge');
+        const validationMsg = document.getElementById('barcodeValidationMsg');
+        const barcodeInput = document.getElementById('productBarcode');
         const productId = document.getElementById('productId').value;
 
-        if (!barcode) {
+        if (!code) {
+            if (typeBadge) typeBadge.classList.add('d-none');
+            if (availBadge) availBadge.classList.add('d-none');
+            if (barcodeInput) barcodeInput.classList.remove('is-invalid');
             document.getElementById('duplicateBarcodeAlert').classList.add('d-none');
-            this.classList.remove('is-invalid');
+            if (validationMsg) {
+                validationMsg.innerHTML = '<i class="bi bi-info-circle me-1"></i>Type the numbers printed below barcode, scan with USB/Bluetooth scanner, or click <b>Scan with Camera</b>.';
+            }
             return;
         }
 
-        const params = new URLSearchParams({ barcode: barcode });
-        if (productId) params.append('exclude_id', productId);
+        // Format detection
+        const info = detectBarcodeType(code);
+        if (info && typeBadge) {
+            typeBadge.className = 'badge ' + info.badgeClass;
+            typeBadge.textContent = info.label;
+            typeBadge.classList.remove('d-none');
+        } else if (typeBadge) {
+            typeBadge.classList.add('d-none');
+        }
 
-        fetch('/api/products/check-barcode?' + params.toString())
+        clearTimeout(barcodeCheckTimeout);
+        barcodeCheckTimeout = setTimeout(() => {
+            const params = new URLSearchParams({ barcode: code });
+            if (productId) params.append('exclude_id', productId);
+
+            fetch('/api/products/check-barcode?' + params.toString())
+                .then(r => r.json())
+                .then(data => {
+                    if (data.exists) {
+                        if (availBadge) {
+                            availBadge.className = 'badge bg-danger';
+                            availBadge.innerHTML = '<i class="bi bi-x-circle me-1"></i>Already in use';
+                            availBadge.classList.remove('d-none');
+                        }
+                        if (barcodeInput) barcodeInput.classList.add('is-invalid');
+                        document.getElementById('duplicateBarcodeAlert').classList.remove('d-none');
+                        document.getElementById('duplicateBarcodeMsg').textContent =
+                            'Barcode "' + code + '" is already assigned to "' + (data.product_name || 'another product') + '".';
+                        if (validationMsg) {
+                            validationMsg.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Duplicate! Assigned to "' + escapeHtml(data.product_name || 'another product') + '".</span>';
+                        }
+                    } else {
+                        if (availBadge) {
+                            availBadge.className = 'badge bg-success';
+                            availBadge.innerHTML = '<i class="bi bi-check-circle me-1"></i>Available';
+                            availBadge.classList.remove('d-none');
+                        }
+                        if (barcodeInput) barcodeInput.classList.remove('is-invalid');
+                        document.getElementById('duplicateBarcodeAlert').classList.add('d-none');
+                        if (validationMsg) {
+                            validationMsg.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check2-circle me-1"></i>Barcode is valid and available!</span>';
+                        }
+                    }
+                })
+                .catch(err => console.error('Barcode check failed:', err));
+        }, 200);
+    }
+
+    // Input & Keydown Listeners for Manual typing & USB/Bluetooth Handheld Scanners
+    const barcodeInput = document.getElementById('productBarcode');
+    if (barcodeInput) {
+        barcodeInput.addEventListener('input', function() {
+            checkBarcodeAvailability(this.value.trim());
+        });
+
+        barcodeInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const val = this.value.trim();
+                if (val) {
+                    playScanBeep();
+                    checkBarcodeAvailability(val);
+                    const hsnEl = document.getElementById('productHsn');
+                    if (hsnEl) hsnEl.focus();
+                }
+            }
+        });
+    }
+
+    // Auto-Generate Barcode Button
+    document.getElementById('btnAutoGenerateBarcode')?.addEventListener('click', function() {
+        const btn = this;
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
+
+        fetch('/api/products/generate-barcode')
             .then(r => r.json())
             .then(data => {
-                if (data.exists) {
-                    document.getElementById('duplicateBarcodeAlert').classList.remove('d-none');
-                    document.getElementById('duplicateBarcodeMsg').textContent = 'A product with barcode "' + barcode + '" already exists.';
-                    document.getElementById('productBarcode').classList.add('is-invalid');
-                    document.getElementById('barcodeFeedback').textContent = 'Duplicate barcode found.';
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                if (data.success && data.barcode) {
+                    const bInput = document.getElementById('productBarcode');
+                    bInput.value = data.barcode;
+                    playScanBeep();
+                    checkBarcodeAvailability(data.barcode);
+                    const validationMsg = document.getElementById('barcodeValidationMsg');
+                    if (validationMsg) {
+                        validationMsg.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-magic me-1"></i>Generated unique in-store EAN-13 barcode: ' + data.barcode + '</span>';
+                    }
                 } else {
-                    document.getElementById('duplicateBarcodeAlert').classList.add('d-none');
-                    document.getElementById('productBarcode').classList.remove('is-invalid');
+                    alert(data.message || 'Failed to generate barcode.');
                 }
             })
-            .catch(() => {});
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                alert('Unable to generate barcode.');
+            });
     });
+
+    // Scan Barcode with Camera Button
+    document.getElementById('btnScanBarcodeModal')?.addEventListener('click', function() {
+        const modalEl = document.getElementById('productCameraModal');
+        const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        modal.show();
+        window.startProductCameraScanner();
+    });
+
+    // ==========================================
+    // Camera Barcode Scanner Logic for Product Form
+    // ==========================================
+    let productCameraStream = null;
+    let isProductCameraRunning = false;
+    let productCodeReader = null;
+    let productScanAnimationId = null;
+    let currentProductCameraId = null;
+
+    window.startProductCameraScanner = async function() {
+        const statusEl = document.getElementById('product-camera-status');
+        const video = document.getElementById('product-camera-preview');
+        if (!statusEl || !video) return;
+
+        statusEl.className = 'mt-2 fs-sm text-primary';
+        statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Starting camera...';
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            statusEl.className = 'mt-2 fs-sm text-danger';
+            statusEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Camera requires HTTPS or localhost. Please use "Snap Photo / Upload" below or enter barcode manually.';
+            return;
+        }
+
+        try {
+            if (productCameraStream) {
+                productCameraStream.getTracks().forEach(t => t.stop());
+                productCameraStream = null;
+            }
+
+            const constraints = {
+                video: currentProductCameraId
+                    ? { deviceId: { exact: currentProductCameraId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+                    : { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            };
+
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (err) {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            }
+
+            productCameraStream = stream;
+            video.srcObject = stream;
+            await video.play();
+
+            isProductCameraRunning = true;
+            statusEl.className = 'mt-2 fs-sm text-success';
+            statusEl.innerHTML = '<i class="bi bi-camera me-1"></i>Point camera at the barcode';
+
+            populateProductCameraDevices();
+
+            // 1. High-performance native BarcodeDetector API (built-in on Chrome/Edge/Android)
+            if ('BarcodeDetector' in window) {
+                try {
+                    const supported = await BarcodeDetector.getSupportedFormats().catch(() => []);
+                    const nativeDetector = new BarcodeDetector({
+                        formats: supported.length ? supported : ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e']
+                    });
+                    startProductNativeScanLoop(video, statusEl, nativeDetector);
+                    return;
+                } catch (e) {
+                    console.warn('Native BarcodeDetector failed, falling back to ZXing', e);
+                }
+            }
+
+            // 2. Fallback to ZXing library
+            startProductZXingScanner(video, statusEl);
+        } catch (err) {
+            console.error('Camera access error:', err);
+            statusEl.className = 'mt-2 fs-sm text-danger';
+            if (err.name === 'NotAllowedError') {
+                statusEl.innerHTML = '<i class="bi bi-shield-x me-1"></i>Camera permission denied. Allow camera in browser settings or use "Snap Photo / Upload" below.';
+            } else if (err.name === 'NotFoundError') {
+                statusEl.innerHTML = '<i class="bi bi-camera-video-off me-1"></i>No camera found on this device.';
+            } else {
+                statusEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Unable to start camera: ' + (err.message || err.name);
+            }
+        }
+    };
+
+    function startProductNativeScanLoop(video, statusEl, detector) {
+        async function step() {
+            if (!isProductCameraRunning) return;
+            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                try {
+                    const barcodes = await detector.detect(video);
+                    if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                        onProductBarcodeDetected(barcodes[0].rawValue, statusEl);
+                        return;
+                    }
+                } catch (e) {}
+            }
+            productScanAnimationId = requestAnimationFrame(step);
+        }
+        productScanAnimationId = requestAnimationFrame(step);
+    }
+
+    function startProductZXingScanner(video, statusEl) {
+        if (!window.ZXing) {
+            statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Loading ZXing scanner...';
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+            script.onload = () => runProductZXing(video, statusEl);
+            script.onerror = () => {
+                statusEl.className = 'mt-2 fs-sm text-warning';
+                statusEl.innerHTML = 'Could not load ZXing. Please use "Snap Photo / Upload" or enter manually.';
+            };
+            document.head.appendChild(script);
+        } else {
+            runProductZXing(video, statusEl);
+        }
+    }
+
+    function runProductZXing(video, statusEl) {
+        try {
+            if (!productCodeReader) {
+                productCodeReader = new ZXing.BrowserMultiFormatReader();
+            }
+            productCodeReader.decodeFromVideoElement(video, (result, err) => {
+                if (result && isProductCameraRunning) {
+                    onProductBarcodeDetected(result.getText(), statusEl);
+                }
+            });
+        } catch (e) {
+            statusEl.className = 'mt-2 fs-sm text-danger';
+            statusEl.innerText = 'Scanner error: ' + (e.message || e);
+        }
+    }
+
+    function onProductBarcodeDetected(code, statusEl) {
+        if (!code) return;
+        const cleanCode = code.trim();
+        playScanBeep();
+        if (navigator.vibrate) {
+            try { navigator.vibrate([100]); } catch (e) {}
+        }
+
+        if (statusEl) {
+            statusEl.className = 'mt-2 fs-sm text-success fw-bold';
+            statusEl.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> Scanned: <b>${escapeHtml(cleanCode)}</b>!`;
+        }
+
+        const bInput = document.getElementById('productBarcode');
+        if (bInput) {
+            bInput.value = cleanCode;
+            checkBarcodeAvailability(cleanCode);
+        }
+
+        setTimeout(() => {
+            const modalEl = document.getElementById('productCameraModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            window.stopProductCameraScanner();
+            if (bInput) bInput.focus();
+        }, 500);
+    }
+
+    window.stopProductCameraScanner = function() {
+        isProductCameraRunning = false;
+        if (productScanAnimationId) {
+            cancelAnimationFrame(productScanAnimationId);
+            productScanAnimationId = null;
+        }
+        if (productCodeReader) {
+            try { productCodeReader.reset(); } catch (e) {}
+        }
+        if (productCameraStream) {
+            productCameraStream.getTracks().forEach(t => t.stop());
+            productCameraStream = null;
+        }
+        const video = document.getElementById('product-camera-preview');
+        if (video) video.srcObject = null;
+    };
+
+    window.restartProductCamera = function() {
+        window.stopProductCameraScanner();
+        const statusEl = document.getElementById('product-camera-status');
+        if (statusEl) {
+            statusEl.className = 'mt-2 fs-sm text-primary';
+            statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Restarting camera...';
+        }
+        setTimeout(window.startProductCameraScanner, 250);
+    };
+
+    window.switchProductCamera = function(deviceId) {
+        currentProductCameraId = deviceId;
+        window.restartProductCamera();
+    };
+
+    async function populateProductCameraDevices() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            const select = document.getElementById('product-camera-select');
+            if (!select || videoDevices.length <= 1) return;
+
+            select.innerHTML = '';
+            videoDevices.forEach((device, index) => {
+                const opt = document.createElement('option');
+                opt.value = device.deviceId;
+                opt.text = device.label || `Camera ${index + 1}`;
+                if (device.deviceId === currentProductCameraId) opt.selected = true;
+                select.appendChild(opt);
+            });
+        } catch (e) {}
+    }
+
+    window.handleProductBarcodeImage = async function(input) {
+        const file = input && input.files && input.files[0];
+        if (!file) return;
+
+        const statusEl = document.getElementById('product-camera-status');
+        if (statusEl) {
+            statusEl.className = 'mt-2 fs-sm text-primary';
+            statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Reading photo...';
+        }
+
+        try {
+            if ('BarcodeDetector' in window) {
+                const bitmap = await createImageBitmap(file);
+                const supported = await BarcodeDetector.getSupportedFormats().catch(() => []);
+                const detector = new BarcodeDetector({
+                    formats: supported.length ? supported : ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e']
+                });
+                const barcodes = await detector.detect(bitmap);
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                    onProductBarcodeDetected(barcodes[0].rawValue, statusEl);
+                    input.value = '';
+                    return;
+                }
+            }
+
+            if (!window.ZXing) {
+                await new Promise(resolve => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+                    s.onload = resolve;
+                    document.head.appendChild(s);
+                });
+            }
+
+            const imgUrl = URL.createObjectURL(file);
+            const img = new Image();
+            img.src = imgUrl;
+            img.onload = async () => {
+                try {
+                    const reader = new ZXing.BrowserMultiFormatReader();
+                    const result = await reader.decodeFromImageElement(img);
+                    URL.revokeObjectURL(imgUrl);
+                    if (result && result.getText()) {
+                        onProductBarcodeDetected(result.getText(), statusEl);
+                        input.value = '';
+                    } else {
+                        throw new Error('No barcode found');
+                    }
+                } catch (err) {
+                    URL.revokeObjectURL(imgUrl);
+                    if (statusEl) {
+                        statusEl.className = 'mt-2 fs-sm text-danger';
+                        statusEl.innerHTML = '<i class="bi bi-x-circle me-1"></i>Could not detect barcode from image. Make sure image is clear and barcode is centered.';
+                    }
+                }
+            };
+        } catch (e) {
+            if (statusEl) {
+                statusEl.className = 'mt-2 fs-sm text-danger';
+                statusEl.innerHTML = '<i class="bi bi-x-circle me-1"></i>Photo decoding failed: ' + (e.message || e);
+            }
+        }
+    };
 
     // ==========================================
     // Toggle Product Status (Activate/Deactivate)

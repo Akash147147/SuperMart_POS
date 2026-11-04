@@ -76,9 +76,15 @@ def list_products():
             )
         )
 
-    category_id = request.args.get('category_id')
-    if category_id:
-        query = query.filter_by(category_id=category_id)
+    category_param = request.args.get('category_id') or request.args.get('category')
+    if category_param:
+        try:
+            cid = int(category_param)
+            query = query.filter_by(category_id=cid)
+        except (ValueError, TypeError):
+            cat = Category.query.filter_by(store_id=store_id, name=category_param).first()
+            if cat:
+                query = query.filter_by(category_id=cat.id)
 
     status_filter = request.args.get('status')
     if status_filter == 'active':
@@ -117,8 +123,27 @@ def check_barcode():
     if exclude_id:
         query = query.filter(Product.id != exclude_id)
 
-    exists = query.first() is not None
-    return jsonify({'exists': exists})
+    existing = query.first()
+    if existing:
+        return jsonify({'exists': True, 'product_id': existing.id, 'product_name': existing.name})
+    return jsonify({'exists': False})
+
+
+@products_bp.route('/api/products/generate-barcode', methods=['GET'])
+@login_required
+def generate_barcode():
+    """Generate a unique valid EAN-13 barcode with internal prefix 200."""
+    import random
+    store_id = current_user.store_id or 1
+    for _ in range(50):
+        # 200 prefix + 9 random digits
+        base = "200" + "".join(str(random.randint(0, 9)) for _ in range(9))
+        total = sum(int(d) * (1 if i % 2 == 0 else 3) for i, d in enumerate(base))
+        check = (10 - (total % 10)) % 10
+        barcode = base + str(check)
+        if not Product.query.filter_by(store_id=store_id, barcode=barcode).first():
+            return jsonify({'success': True, 'barcode': barcode})
+    return jsonify({'success': False, 'message': 'Could not generate unique barcode'}), 500
 
 
 @products_bp.route('/api/products/<int:id>/status', methods=['PUT'])
