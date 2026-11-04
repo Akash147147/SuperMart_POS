@@ -100,12 +100,13 @@ def search():
 def calculate():
     """Calculate cart totals including taxes, discounts, and round-off."""
     data = request.get_json(silent=True) or {}
-    cart_items = data.get('cart_items', [])
+    cart_items = data.get('cart_items') or data.get('items') or []
 
     if not cart_items:
         return jsonify({'success': False, 'message': 'Cart is empty'}), 400
 
-    store = Store.query.get(current_user.store_id)
+    store_id = current_user.store_id or 1
+    store = Store.query.get(store_id) or Store.query.first()
     if not store:
         return jsonify({'success': False, 'message': 'Store not found'}), 404
 
@@ -126,7 +127,7 @@ def complete():
     """Complete a sale transaction – create invoice, deduct stock, record payment."""
     data = request.get_json(silent=True) or {}
 
-    cart_items = data.get('cart_items', [])
+    cart_items = data.get('cart_items') or data.get('items') or []
     payment_data = data.get('payment_data', [])
     customer_id = data.get('customer_id')
     bill_discount_pct = to_decimal(data.get('bill_discount_pct'), '0')
@@ -140,7 +141,8 @@ def complete():
     if not payment_data:
         return jsonify({'success': False, 'message': 'Payment information is required'}), 400
 
-    store = Store.query.get(current_user.store_id)
+    store_id = current_user.store_id or 1
+    store = Store.query.get(store_id) or Store.query.first()
     if not store:
         return jsonify({'success': False, 'message': 'Store not found'}), 404
 

@@ -507,11 +507,61 @@ function updateSummaryZeros() {
     currentFinalAmount = 0;
 }
 
+function updateClientTotals() {
+    if (!cart || cart.length === 0) {
+        updateSummaryZeros();
+        return;
+    }
+
+    let subtotal = 0;
+    let totalDiscount = 0;
+    let totalQty = 0;
+    let estTaxPart = 0;
+
+    cart.forEach(item => {
+        const qty = parseFloat(item.quantity) || 1;
+        const sp = parseFloat(item.selling_price) || 0;
+        const disc = parseFloat(item.discount_amount) || 0;
+        const line = Math.max(0, (sp * qty) - disc);
+
+        subtotal += (sp * qty);
+        totalDiscount += disc;
+        totalQty += qty;
+
+        const gst = parseFloat(item.gst_percentage) || 0;
+        if (gst > 0) {
+            // Price is tax-inclusive in retail POS
+            const tax = (line * gst) / (100 + gst);
+            estTaxPart += tax;
+        }
+    });
+
+    const netAmount = Math.max(0, subtotal - totalDiscount);
+    const roundOff = Math.round(netAmount) - netAmount;
+    const finalAmount = Math.round(netAmount);
+    currentFinalAmount = netAmount;
+
+    const totalCount = cart.length;
+    document.getElementById('item-count-badge').innerText = `${totalCount} item${totalCount !== 1 ? 's' : ''}`;
+    document.getElementById('sum-subtotal').innerText = '₹' + subtotal.toFixed(2);
+    document.getElementById('sum-discount').innerText = '-₹' + totalDiscount.toFixed(2);
+    document.getElementById('sum-taxable').innerText = '₹' + (netAmount - estTaxPart).toFixed(2);
+    document.getElementById('sum-cgst').innerText = '₹' + (estTaxPart / 2).toFixed(2);
+    document.getElementById('sum-sgst').innerText = '₹' + (estTaxPart / 2).toFixed(2);
+    document.getElementById('sum-roundoff').innerText = (roundOff >= 0 ? '₹' : '-₹') + Math.abs(roundOff).toFixed(2);
+    document.getElementById('sum-final').innerText = '₹' + finalAmount.toFixed(2);
+}
+
 function calculateServerTotals() {
+    // Instant client-side computation
+    updateClientTotals();
+
+    if (!cart || cart.length === 0) return;
+
     fetch('/api/billing/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-        body: JSON.stringify({ items: cart })
+        body: JSON.stringify({ cart_items: cart, items: cart })
     })
     .then(r => r.json())
     .then(res => {
@@ -524,9 +574,12 @@ function calculateServerTotals() {
             document.getElementById('sum-sgst').innerText = '₹' + d.sgst_total;
             document.getElementById('sum-roundoff').innerText = '₹' + d.round_off;
             document.getElementById('sum-final').innerText = '₹' + d.final_amount;
-            document.getElementById('item-count-badge').innerText = `${d.total_items} items`;
+            document.getElementById('item-count-badge').innerText = `${d.total_items} item${d.total_items !== 1 ? 's' : ''}`;
             currentFinalAmount = parseFloat(d.final_amount);
         }
+    })
+    .catch(err => {
+        console.warn('Server total calculation error:', err);
     });
 }
 
@@ -534,10 +587,15 @@ function calculateServerTotals() {
 const payModal = new bootstrap.Modal(document.getElementById('paymentModal'));
 document.getElementById('btn-checkout').addEventListener('click', () => {
     if (cart.length === 0) {
-        alert('Cart is empty');
+        alert('Cart is empty. Please scan or add a product to begin billing.');
         return;
     }
+    updateClientTotals();
     document.getElementById('modal-due-amount').innerText = '₹' + currentFinalAmount.toFixed(2);
+    document.getElementById('cash-received').value = currentFinalAmount.toFixed(2);
+    document.getElementById('cash-change').innerText = '₹0.00';
+    payModal.show();
+});
     document.getElementById('cash-received').value = currentFinalAmount.toFixed(2);
     document.getElementById('cash-change').innerText = '₹0.00';
     payModal.show();
@@ -583,6 +641,7 @@ document.getElementById('btn-confirm-payment').addEventListener('click', () => {
 
     const payload = {
         cart_items: cart,
+        items: cart,
         payment_data: [{
             method: method,
             amount: currentFinalAmount,

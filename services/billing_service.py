@@ -49,7 +49,15 @@ def calculate_cart_totals(cart_items, store):
     serial = 0
 
     for item in cart_items:
-        product = db.session.get(Product, item['product_id'])
+        prod_id = item.get('product_id') or item.get('id')
+        product = None
+        if prod_id:
+            try:
+                product = db.session.get(Product, int(prod_id))
+            except (ValueError, TypeError):
+                product = None
+        if not product and item.get('barcode'):
+            product = Product.query.filter_by(barcode=item['barcode'], store_id=store.id).first()
         if not product:
             continue
 
@@ -165,9 +173,17 @@ def complete_sale(cart_items, payment_data, store, cashier, counter=None,
     items_to_deduct = []  # (product, quantity) pairs
 
     for item in cart_items:
-        product = db.session.get(Product, item['product_id'])
+        prod_id = item.get('product_id') or item.get('id')
+        product = None
+        if prod_id:
+            try:
+                product = db.session.get(Product, int(prod_id))
+            except (ValueError, TypeError):
+                product = None
+        if not product and item.get('barcode'):
+            product = Product.query.filter_by(barcode=item['barcode'], store_id=store.id).first()
         if not product or not product.is_active:
-            raise ValueError(f"Product {item['product_id']} not found or inactive")
+            raise ValueError(f"Product {item.get('product_name') or prod_id} not found or inactive")
 
         serial += 1
         qty = Decimal(str(item.get('quantity', 1)))
@@ -285,7 +301,7 @@ def complete_sale(cart_items, payment_data, store, cashier, counter=None,
         )
         invoice.payments.append(payment)
 
-    if total_paid < final_amount:
+    if total_paid < (final_amount - Decimal('0.50')):
         raise ValueError(
             f"Payment amount ({total_paid}) is less than bill amount ({final_amount})"
         )

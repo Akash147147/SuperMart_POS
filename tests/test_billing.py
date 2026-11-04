@@ -192,6 +192,32 @@ class TestBillingAndInventory(unittest.TestCase):
         self.assertTrue(validate_ean13_checksum("8901234567890"))
         self.assertFalse(validate_ean13_checksum("8901234567899"))
 
+    def test_calculate_api_with_items_and_cart_items(self):
+        """Verify /api/billing/calculate accepts both 'items' and 'cart_items' keys and calculates totals correctly."""
+        client = self.app.test_client()
+        with client.session_transaction() as sess:
+            sess['_user_id'] = str(self.cashier.id)
+            sess['_fresh'] = True
+
+        # Test with 'items' key (sent by client)
+        resp1 = client.post('/api/billing/calculate', json={
+            'items': [{'product_id': self.product.id, 'quantity': 2, 'discount_amount': 0, 'discount_percentage': 0}]
+        })
+        self.assertEqual(resp1.status_code, 200)
+        data1 = resp1.get_json()
+        self.assertTrue(data1['success'])
+        self.assertEqual(data1['data']['total_items'], 1)
+        self.assertEqual(data1['data']['subtotal'], '280.00')
+
+        # Test with 'cart_items' key
+        resp2 = client.post('/api/billing/calculate', json={
+            'cart_items': [{'product_id': self.product.id, 'quantity': 1, 'discount_amount': 0, 'discount_percentage': 0}]
+        })
+        self.assertEqual(resp2.status_code, 200)
+        data2 = resp2.get_json()
+        self.assertTrue(data2['success'])
+        self.assertEqual(data2['data']['total_items'], 1)
+
 
 if __name__ == '__main__':
     unittest.main()
