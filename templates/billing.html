@@ -192,6 +192,36 @@
     </div>
 </div>
 
+<!-- Camera Scanner Modal -->
+<div class="modal fade" id="cameraModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-navy text-white">
+                <h5 class="modal-title"><i class="bi bi-camera"></i> Camera Barcode Scanner</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="stopCameraScanner()"></button>
+            </div>
+            <div class="modal-body text-center p-3">
+                <div class="mb-2">
+                    <select id="camera-select" class="form-select form-select-sm mb-2" onchange="switchCamera(this.value)">
+                        <option value="">Default Camera</option>
+                    </select>
+                </div>
+                <div style="position: relative; width: 100%; max-height: 280px; overflow: hidden; background: #000; border-radius: 8px;">
+                    <video id="camera-preview" style="width: 100%; height: 280px; object-fit: cover;"></video>
+                    <!-- Visual laser line -->
+                    <div style="position: absolute; top: 50%; left: 10%; right: 10%; height: 2px; background: rgba(255, 0, 0, 0.7); box-shadow: 0 0 6px red;"></div>
+                </div>
+                <div id="camera-scan-status" class="mt-2 fs-sm text-muted">
+                    Align barcode with the red line
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="stopCameraScanner()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Product Search Modal -->
 <div class="modal fade" id="searchModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -478,6 +508,94 @@ document.getElementById('btn-clear-cart').addEventListener('click', () => {
 
 // Search Modal
 const searchModal = new bootstrap.Modal(document.getElementById('searchModal'));
+const cameraModal = new bootstrap.Modal(document.getElementById('cameraModal'));
+
+let codeReader = null;
+let currentCameraDeviceId = null;
+let lastScannedCode = null;
+let lastScannedTime = 0;
+
+document.getElementById('btn-camera-modal').addEventListener('click', () => {
+    cameraModal.show();
+    startCameraScanner();
+});
+
+async function startCameraScanner() {
+    const statusEl = document.getElementById('camera-scan-status');
+    statusEl.className = 'mt-2 fs-sm text-muted';
+    statusEl.innerText = 'Initializing camera...';
+
+    if (!window.ZXing) {
+        // Load ZXing dynamically if not already cached
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js';
+        script.onload = () => initZXing();
+        script.onerror = () => { statusEl.innerText = 'Unable to load scanner library.'; };
+        document.head.appendChild(script);
+    } else {
+        initZXing();
+    }
+}
+
+async function initZXing() {
+    const statusEl = document.getElementById('camera-scan-status');
+    try {
+        if (!codeReader) {
+            codeReader = new ZXing.BrowserMultiFormatReader();
+        }
+
+        const videoInputDevices = await codeReader.listVideoInputDevices();
+        const selectEl = document.getElementById('camera-select');
+        selectEl.innerHTML = '';
+
+        videoInputDevices.forEach((device, idx) => {
+            const opt = document.createElement('option');
+            opt.value = device.deviceId;
+            opt.text = device.label || `Camera ${idx + 1}`;
+            selectEl.appendChild(opt);
+        });
+
+        const selectedDeviceId = currentCameraDeviceId || (videoInputDevices[0] ? videoInputDevices[0].deviceId : undefined);
+
+        statusEl.innerText = 'Camera active. Aim at any barcode.';
+
+        codeReader.decodeFromVideoDevice(selectedDeviceId, 'camera-preview', (result, err) => {
+            if (result) {
+                const now = Date.now();
+                const code = result.getText();
+                // Prevent duplicate scanning within 1.5 seconds
+                if (code === lastScannedCode && (now - lastScannedTime) < 1500) {
+                    return;
+                }
+                lastScannedCode = code;
+                lastScannedTime = now;
+
+                statusEl.className = 'mt-2 fs-sm text-success fw-bold';
+                statusEl.innerText = `Detected: ${code}! Adding to bill...`;
+
+                lookupBarcode(code);
+                cameraModal.hide();
+                stopCameraScanner();
+            }
+        });
+    } catch (e) {
+        statusEl.className = 'mt-2 fs-sm text-danger';
+        statusEl.innerText = 'Camera error: ' + (e.message || e);
+    }
+}
+
+function switchCamera(deviceId) {
+    currentCameraDeviceId = deviceId;
+    stopCameraScanner();
+    initZXing();
+}
+
+function stopCameraScanner() {
+    if (codeReader) {
+        codeReader.reset();
+    }
+}
+
 document.getElementById('btn-search-modal').addEventListener('click', () => {
     searchModal.show();
     document.getElementById('modal-search-box').focus();

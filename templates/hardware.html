@@ -8,11 +8,46 @@
 </div>
 
 <div class="row g-3">
+    <!-- WebHID Direct Hardware Scanner Card -->
+    <div class="col-md-6">
+        <div class="card-section p-3">
+            <h5 class="mb-3"><i class="bi bi-usb-symbol text-primary"></i> Direct USB Scanner (WebHID Connect)</h5>
+            <p class="text-muted fs-sm">
+                Connect your USB barcode scanner directly through Chrome/Edge using the <strong>WebHID API</strong>.
+                Click <strong>"Pair USB Scanner"</strong>, select your scanner from the browser prompt, and it will be directly bound to this website.
+            </p>
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn btn-primary btn-sm" id="btn-pair-hid" onclick="connectWebHIDScanner()">
+                    <i class="bi bi-link-45deg"></i> Pair USB Scanner
+                </button>
+                <span id="hid-status" class="badge bg-secondary align-self-center py-2 px-3">Not Connected</span>
+            </div>
+            <div id="hid-device-info" class="fs-sm text-muted mb-2"></div>
+        </div>
+    </div>
+
+    <!-- Web Bluetooth Direct Scanner Card -->
+    <div class="col-md-6">
+        <div class="card-section p-3">
+            <h5 class="mb-3"><i class="bi bi-bluetooth text-info"></i> Direct Wireless Scanner (Web Bluetooth)</h5>
+            <p class="text-muted fs-sm">
+                Pair wireless Bluetooth barcode scanners directly through the browser without needing third-party drivers or dongles.
+            </p>
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn btn-info text-white btn-sm" id="btn-pair-ble" onclick="connectBluetoothScanner()">
+                    <i class="bi bi-bluetooth"></i> Pair Bluetooth Scanner
+                </button>
+                <span id="ble-status" class="badge bg-secondary align-self-center py-2 px-3">Not Connected</span>
+            </div>
+            <div id="ble-device-info" class="fs-sm text-muted mb-2"></div>
+        </div>
+    </div>
+
     <!-- Scanner Test Card -->
     <div class="col-md-6">
         <div class="card-section p-3">
-            <h5 class="mb-3"><i class="bi bi-upc"></i> Barcode Scanner Test</h5>
-            <p class="text-muted fs-sm">Test USB, Wireless, or Bluetooth keyboard-emulation barcode scanners.</p>
+            <h5 class="mb-3"><i class="bi bi-upc"></i> Barcode Scanner Test (Keyboard / HID)</h5>
+            <p class="text-muted fs-sm">Test standard plug-and-play USB, Wireless dongle, or Bluetooth keyboard-emulation barcode scanners.</p>
             <div class="mb-3">
                 <input type="text" id="scanner-test-input" class="form-control form-control-lg" placeholder="Scan any barcode here...">
             </div>
@@ -46,6 +81,54 @@
 <script>
 const testInput = document.getElementById('scanner-test-input');
 const testLog = document.getElementById('scanner-test-log');
+
+// WebHID Direct USB Pairing
+let connectedHidDevice = null;
+async function connectWebHIDScanner() {
+    if (!('hid' in navigator)) {
+        alert('WebHID is not supported by your browser. Please use Google Chrome or Microsoft Edge.');
+        return;
+    }
+    try {
+        const devices = await navigator.hid.requestDevice({ filters: [] });
+        if (devices.length > 0) {
+            connectedHidDevice = devices[0];
+            await connectedHidDevice.open();
+            document.getElementById('hid-status').className = 'badge bg-success align-self-center py-2 px-3';
+            document.getElementById('hid-status').innerText = 'Connected';
+            document.getElementById('hid-device-info').innerHTML = `<strong>Device:</strong> ${connectedHidDevice.productName || 'USB Scanner'} (Vendor: ${connectedHidDevice.vendorId})`;
+
+            // Listen for input reports from scanner
+            connectedHidDevice.addEventListener('inputreport', (event) => {
+                const { data, device, reportId } = event;
+                const textDecoder = new TextDecoder('utf-8');
+                const raw = textDecoder.decode(data);
+                testLog.innerHTML = `<span class="text-primary">[WebHID Direct]</span> Raw data received from ${device.productName}: ${raw}<br>` + testLog.innerHTML;
+            });
+        }
+    } catch (err) {
+        console.warn('HID connection cancelled or failed:', err);
+    }
+}
+
+// Web Bluetooth Direct Pairing
+async function connectBluetoothScanner() {
+    if (!('bluetooth' in navigator)) {
+        alert('Web Bluetooth is not supported by your browser. Please use Chrome or Edge with Bluetooth enabled.');
+        return;
+    }
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['generic_access', 'human_interface_device']
+        });
+        document.getElementById('ble-status').className = 'badge bg-success align-self-center py-2 px-3';
+        document.getElementById('ble-status').innerText = 'Paired';
+        document.getElementById('ble-device-info').innerHTML = `<strong>Device:</strong> ${device.name || 'Bluetooth Scanner'} (ID: ${device.id.substring(0, 10)}...)`;
+    } catch (err) {
+        console.warn('Bluetooth pairing cancelled or failed:', err);
+    }
+}
 
 testInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
