@@ -1,4 +1,4 @@
-"""Invoice service - retrieval and PDF generation."""
+﻿"""Invoice service - retrieval and PDF generation."""
 from decimal import Decimal
 from io import BytesIO
 from datetime import datetime
@@ -193,19 +193,19 @@ def generate_invoice_pdf(invoice, store):
 
     # Totals
     totals = [
-        ['Subtotal', f'₹{invoice.subtotal}'],
-        ['Discount', f'₹{invoice.discount_amount}'],
-        ['Taxable Amount', f'₹{invoice.taxable_amount}'],
+        ['Subtotal', f'Rs. {invoice.subtotal}'],
+        ['Discount', f'Rs. {invoice.discount_amount}'],
+        ['Taxable Amount', f'Rs. {invoice.taxable_amount}'],
     ]
     if invoice.tax_type == 'intra-state':
-        totals.append(['CGST', f'₹{invoice.cgst_total}'])
-        totals.append(['SGST', f'₹{invoice.sgst_total}'])
+        totals.append(['CGST', f'Rs. {invoice.cgst_total}'])
+        totals.append(['SGST', f'Rs. {invoice.sgst_total}'])
     else:
-        totals.append(['IGST', f'₹{invoice.igst_total}'])
-    if invoice.cess_total > 0:
-        totals.append(['Cess', f'₹{invoice.cess_total}'])
-    totals.append(['Round Off', f'₹{invoice.round_off}'])
-    totals.append(['Net Amount', f'₹{invoice.final_amount}'])
+        totals.append(['IGST', f'Rs. {invoice.igst_total}'])
+    if invoice.cess_total and invoice.cess_total > 0:
+        totals.append(['Cess', f'Rs. {invoice.cess_total}'])
+    totals.append(['Round Off', f'Rs. {invoice.round_off}'])
+    totals.append(['Net Amount', f'Rs. {invoice.final_amount}'])
 
     totals_table = Table(totals, colWidths=[doc.width * 0.7, doc.width * 0.3])
     totals_table.setStyle(TableStyle([
@@ -226,7 +226,7 @@ def generate_invoice_pdf(invoice, store):
 
     # Payment info
     for p in invoice.payments:
-        elements.append(Paragraph(f"Payment: {p.payment_method.upper()} - ₹{p.amount}", styles['Normal']))
+        elements.append(Paragraph(f"Payment: {p.payment_method.upper()} - Rs. {p.amount}", styles['Normal']))
     elements.append(Spacer(1, 3 * unit_mm))
 
     # Footer
@@ -238,4 +238,5 @@ def generate_invoice_pdf(invoice, store):
     doc.build(elements)
     buffer.seek(0)
     return buffer
+
 

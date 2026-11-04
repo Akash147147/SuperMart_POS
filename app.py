@@ -1,6 +1,14 @@
 """SuperMart POS - Flask Application Factory."""
 import os
+import sys
+from pathlib import Path
 from datetime import datetime, timezone
+
+# Ensure project base directory is always in sys.path
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 from flask import Flask
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
