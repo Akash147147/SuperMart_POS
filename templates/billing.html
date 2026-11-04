@@ -215,25 +215,27 @@
         <div class="modal-content">
             <div class="modal-header bg-navy text-white">
                 <h5 class="modal-title"><i class="bi bi-camera"></i> Camera Barcode Scanner</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="stopCameraScanner()"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center p-3">
-                <div class="mb-2">
-                    <select id="camera-select" class="form-select form-select-sm mb-2" onchange="switchCamera(this.value)">
-                        <option value="">Default Camera</option>
+                <div class="mb-2 d-flex justify-content-between align-items-center">
+                    <label class="form-label mb-0 fs-sm fw-bold"><i class="bi bi-camera-video"></i> Select Camera:</label>
+                    <select id="camera-select" class="form-select form-select-sm" style="max-width: 220px;" onchange="switchCamera(this.value)">
+                        <option value="">Detecting cameras...</option>
                     </select>
                 </div>
-                <div style="position: relative; width: 100%; max-height: 280px; overflow: hidden; background: #000; border-radius: 8px;">
-                    <video id="camera-preview" style="width: 100%; height: 280px; object-fit: cover;"></video>
-                    <!-- Visual laser line -->
-                    <div style="position: absolute; top: 50%; left: 10%; right: 10%; height: 2px; background: rgba(255, 0, 0, 0.7); box-shadow: 0 0 6px red;"></div>
+                <div style="position: relative; width: 100%; height: 280px; overflow: hidden; background: #000; border-radius: 8px;">
+                    <video id="camera-preview" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    <!-- Targeting Frame and Scanning Laser -->
+                    <div style="position: absolute; top: 15%; bottom: 15%; left: 10%; right: 10%; border: 2px dashed rgba(40, 167, 69, 0.75); border-radius: 8px; pointer-events: none;"></div>
+                    <div style="position: absolute; top: 50%; left: 8%; right: 8%; height: 2px; background: rgba(255, 0, 0, 0.85); box-shadow: 0 0 8px red; pointer-events: none;"></div>
                 </div>
                 <div id="camera-scan-status" class="mt-2 fs-sm text-muted">
-                    Align barcode with the red line
+                    Align barcode inside the frame
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="stopCameraScanner()">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -270,6 +272,8 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"
+        onerror="this.onerror=null;this.src='https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';"></script>
 <script>
 let cart = [];
 let currentFinalAmount = 0;
@@ -609,93 +613,252 @@ document.getElementById('btn-clear-cart').addEventListener('click', () => {
     }
 });
 
-// Search Modal
+// Search & Camera Modals
 const searchModal = new bootstrap.Modal(document.getElementById('searchModal'));
-const cameraModal = new bootstrap.Modal(document.getElementById('cameraModal'));
+const cameraModalEl = document.getElementById('cameraModal');
+const cameraModal = new bootstrap.Modal(cameraModalEl);
 
+let cameraStream = null;
+let nativeDetector = null;
+let scanAnimationId = null;
 let codeReader = null;
 let currentCameraDeviceId = null;
 let lastScannedCode = null;
 let lastScannedTime = 0;
 
+// POS Scanner Beep Sound using Web Audio API
+function playScanBeep() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 1400;
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+    } catch (e) {
+        // AudioContext not permitted or supported
+    }
+}
+
+// Camera button triggers the modal
 document.getElementById('btn-camera-modal').addEventListener('click', () => {
     cameraModal.show();
+});
+
+// Start camera only after modal is fully rendered so video element has real dimensions
+cameraModalEl.addEventListener('shown.bs.modal', () => {
     startCameraScanner();
+});
+
+// Stop camera hardware and release webcam when modal is closed
+cameraModalEl.addEventListener('hidden.bs.modal', () => {
+    stopCameraScanner();
 });
 
 async function startCameraScanner() {
     const statusEl = document.getElementById('camera-scan-status');
+    const video = document.getElementById('camera-preview');
     statusEl.className = 'mt-2 fs-sm text-muted';
-    statusEl.innerText = 'Initializing camera...';
+    statusEl.innerText = 'Requesting camera access...';
 
-    if (!window.ZXing) {
-        // Load ZXing dynamically if not already cached
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js';
-        script.onload = () => initZXing();
-        script.onerror = () => { statusEl.innerText = 'Unable to load scanner library.'; };
-        document.head.appendChild(script);
-    } else {
-        initZXing();
+    // Verify secure context (HTTPS or localhost)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        statusEl.className = 'mt-2 fs-sm text-danger';
+        statusEl.innerHTML = '<i class="bi bi-shield-exclamation text-danger"></i> Camera requires a secure connection (HTTPS or localhost). Please ensure the URL starts with <b>https://</b>.';
+        return;
+    }
+
+    try {
+        stopCameraScanner();
+
+        // 1. Request camera stream (prefer back camera for barcodes)
+        const constraints = {
+            video: currentCameraDeviceId 
+                ? { deviceId: { exact: currentCameraDeviceId } }
+                : { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        };
+
+        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = cameraStream;
+        await video.play();
+
+        statusEl.className = 'mt-2 fs-sm text-success';
+        statusEl.innerHTML = '<i class="bi bi-camera-video-fill"></i> Camera active. Aim at any barcode.';
+
+        // Populate available cameras dropdown
+        populateCameraDevices();
+
+        // 2. High-performance native BarcodeDetector API (built-in on Chrome/Edge/Android)
+        if ('BarcodeDetector' in window) {
+            try {
+                nativeDetector = new BarcodeDetector({
+                    formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code']
+                });
+                startNativeScanLoop(video, statusEl);
+                return;
+            } catch (err) {
+                console.warn('Native BarcodeDetector init failed, using ZXing:', err);
+            }
+        }
+
+        // 3. Fallback to ZXing library
+        startZXingScanner(video, statusEl);
+
+    } catch (err) {
+        console.error('Camera access error:', err);
+        statusEl.className = 'mt-2 fs-sm text-danger';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            statusEl.innerHTML = '<i class="bi bi-shield-lock-fill"></i> <b>Camera access blocked.</b><br>Please click the camera/lock icon in your browser address bar and select <b>"Allow"</b>.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            statusEl.innerHTML = '<i class="bi bi-camera-video-off"></i> No camera hardware detected on this device.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+            statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Camera is in use by another app (Zoom, Teams, Camera app). Please close it and retry.';
+        } else {
+            statusEl.innerText = 'Camera error: ' + (err.message || err.name || err);
+        }
     }
 }
 
-async function initZXing() {
-    const statusEl = document.getElementById('camera-scan-status');
+function startNativeScanLoop(video, statusEl) {
+    async function scanFrame() {
+        if (!cameraStream || video.readyState < 2) {
+            scanAnimationId = requestAnimationFrame(scanFrame);
+            return;
+        }
+
+        try {
+            const barcodes = await nativeDetector.detect(video);
+            if (barcodes && barcodes.length > 0) {
+                const rawValue = barcodes[0].rawValue;
+                if (rawValue) {
+                    onBarcodeDetected(rawValue, statusEl);
+                    return;
+                }
+            }
+        } catch (e) {
+            // Frame detection error, ignore and continue
+        }
+
+        scanAnimationId = requestAnimationFrame(scanFrame);
+    }
+    scanAnimationId = requestAnimationFrame(scanFrame);
+}
+
+function startZXingScanner(video, statusEl) {
+    if (!window.ZXing) {
+        statusEl.className = 'mt-2 fs-sm text-warning';
+        statusEl.innerText = 'Loading scanner library...';
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+        script.onload = () => runZXing(video, statusEl);
+        script.onerror = () => {
+            statusEl.className = 'mt-2 fs-sm text-danger';
+            statusEl.innerText = 'Could not load scanner library. Please check your internet connection.';
+        };
+        document.head.appendChild(script);
+    } else {
+        runZXing(video, statusEl);
+    }
+}
+
+function runZXing(video, statusEl) {
     try {
         if (!codeReader) {
             codeReader = new ZXing.BrowserMultiFormatReader();
         }
-
-        const videoInputDevices = await codeReader.listVideoInputDevices();
-        const selectEl = document.getElementById('camera-select');
-        selectEl.innerHTML = '';
-
-        videoInputDevices.forEach((device, idx) => {
-            const opt = document.createElement('option');
-            opt.value = device.deviceId;
-            opt.text = device.label || `Camera ${idx + 1}`;
-            selectEl.appendChild(opt);
-        });
-
-        const selectedDeviceId = currentCameraDeviceId || (videoInputDevices[0] ? videoInputDevices[0].deviceId : undefined);
-
-        statusEl.innerText = 'Camera active. Aim at any barcode.';
-
+        const selectedDeviceId = currentCameraDeviceId || undefined;
         codeReader.decodeFromVideoDevice(selectedDeviceId, 'camera-preview', (result, err) => {
             if (result) {
-                const now = Date.now();
-                const code = result.getText();
-                // Prevent duplicate scanning within 1.5 seconds
-                if (code === lastScannedCode && (now - lastScannedTime) < 1500) {
-                    return;
-                }
-                lastScannedCode = code;
-                lastScannedTime = now;
-
-                statusEl.className = 'mt-2 fs-sm text-success fw-bold';
-                statusEl.innerText = `Detected: ${code}! Adding to bill...`;
-
-                lookupBarcode(code);
-                cameraModal.hide();
-                stopCameraScanner();
+                onBarcodeDetected(result.getText(), statusEl);
             }
         });
     } catch (e) {
         statusEl.className = 'mt-2 fs-sm text-danger';
-        statusEl.innerText = 'Camera error: ' + (e.message || e);
+        statusEl.innerText = 'ZXing error: ' + (e.message || e);
     }
+}
+
+function onBarcodeDetected(code, statusEl) {
+    const now = Date.now();
+    if (code === lastScannedCode && (now - lastScannedTime) < 1500) {
+        return;
+    }
+    lastScannedCode = code;
+    lastScannedTime = now;
+
+    // Audible confirmation beep
+    playScanBeep();
+
+    statusEl.className = 'mt-2 fs-sm text-success fw-bold';
+    statusEl.innerHTML = `<i class="bi bi-check-circle-fill"></i> Scanned: <b>${code}</b>! Adding to bill...`;
+
+    lookupBarcode(code);
+
+    setTimeout(() => {
+        cameraModal.hide();
+        stopCameraScanner();
+    }, 400);
 }
 
 function switchCamera(deviceId) {
     currentCameraDeviceId = deviceId;
-    stopCameraScanner();
-    initZXing();
+    startCameraScanner();
 }
 
 function stopCameraScanner() {
+    if (scanAnimationId) {
+        cancelAnimationFrame(scanAnimationId);
+        scanAnimationId = null;
+    }
     if (codeReader) {
-        codeReader.reset();
+        try {
+            codeReader.reset();
+        } catch (e) {}
+    }
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => {
+            try { track.stop(); } catch (e) {}
+        });
+        cameraStream = null;
+    }
+    const video = document.getElementById('camera-preview');
+    if (video) {
+        video.srcObject = null;
+    }
+}
+
+async function populateCameraDevices() {
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        const selectEl = document.getElementById('camera-select');
+        if (!selectEl) return;
+
+        selectEl.innerHTML = '';
+        if (videoDevices.length === 0) {
+            selectEl.innerHTML = '<option value="">Default Camera</option>';
+            return;
+        }
+
+        videoDevices.forEach((device, idx) => {
+            const opt = document.createElement('option');
+            opt.value = device.deviceId;
+            opt.text = device.label || `Camera ${idx + 1}`;
+            if (device.deviceId === currentCameraDeviceId) {
+                opt.selected = true;
+            }
+            selectEl.appendChild(opt);
+        });
+    } catch (e) {
+        console.warn('Could not enumerate camera devices:', e);
     }
 }
 
