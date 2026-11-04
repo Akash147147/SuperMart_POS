@@ -218,6 +218,51 @@ class TestBillingAndInventory(unittest.TestCase):
         self.assertTrue(data2['success'])
         self.assertEqual(data2['data']['total_items'], 1)
 
+    def test_gst_18_calculation_and_sale(self):
+        """Test calculation and completion for 18% GST product (e.g. 160.00 SP -> 189.00 final)."""
+        badam = Product(
+            store_id=self.store.id,
+            name='Badam 250g',
+            barcode='8909999888812',
+            category_id=self.category.id,
+            selling_price=Decimal('160.00'),
+            mrp=Decimal('180.00'),
+            gst_percentage=Decimal('18.00'),
+            stock_quantity=Decimal('20.000'),
+            min_stock_level=Decimal('5.000'),
+            is_active=True
+        )
+        db.session.add(badam)
+        db.session.commit()
+
+        cart_items = [{'product_id': badam.id, 'quantity': 1, 'discount_amount': '', 'discount_percentage': ''}]
+        totals = calculate_cart_totals(cart_items, self.store)
+        self.assertEqual(totals['subtotal'], '160.00')
+        self.assertEqual(totals['taxable_amount'], '160.00')
+        self.assertEqual(totals['cgst_total'], '14.40')
+        self.assertEqual(totals['sgst_total'], '14.40')
+        self.assertEqual(totals['tax_total'], '28.80')
+        self.assertEqual(totals['round_off'], '0.20')
+        self.assertEqual(totals['final_amount'], '189.00')
+
+        # Test completing sale with cash received 189.00
+        payment_data = [{
+            'method': 'cash',
+            'amount': '189.00',
+            'amount_received': '189.00',
+            'change_returned': '0.00'
+        }]
+        invoice = complete_sale(cart_items, payment_data, self.store, self.cashier, self.counter)
+        self.assertIsNotNone(invoice.id)
+        self.assertEqual(invoice.final_amount, Decimal('189.00'))
+
+        # Test complete sale with UPI
+        cart_items_2 = [{'product_id': badam.id, 'quantity': 1}]
+        payment_data_2 = [{'method': 'upi', 'amount': '189.00', 'reference': 'UPI123456'}]
+        inv2 = complete_sale(cart_items_2, payment_data_2, self.store, self.cashier, self.counter)
+        self.assertIsNotNone(inv2.id)
+        self.assertEqual(inv2.final_amount, Decimal('189.00'))
+
 
 if __name__ == '__main__':
     unittest.main()

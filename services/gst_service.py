@@ -13,6 +13,20 @@ GST_RATES = [
 TWO_PLACES = Decimal('0.01')
 
 
+def to_decimal(val, default='0.00'):
+    """Safely convert a value to Decimal, returning default if None, empty, or invalid."""
+    if val is None or val == '' or val == 'null':
+        return Decimal(str(default))
+    try:
+        if isinstance(val, str):
+            val = val.strip()
+            if not val or val.lower() in ('none', 'null', 'nan'):
+                return Decimal(str(default))
+        return Decimal(str(val))
+    except Exception:
+        return Decimal(str(default))
+
+
 def calculate_item_tax(selling_price, quantity, gst_percentage, cess_percentage=Decimal('0.00'),
                        discount_amount=Decimal('0.00'), tax_type='intra-state',
                        is_gst_exempt=False):
@@ -22,11 +36,11 @@ def calculate_item_tax(selling_price, quantity, gst_percentage, cess_percentage=
     All inputs should be Decimal.
     Returns dict with all tax components.
     """
-    selling_price = Decimal(str(selling_price))
-    quantity = Decimal(str(quantity))
-    gst_percentage = Decimal(str(gst_percentage))
-    cess_percentage = Decimal(str(cess_percentage))
-    discount_amount = Decimal(str(discount_amount))
+    selling_price = to_decimal(selling_price, '0.00')
+    quantity = to_decimal(quantity, '1')
+    gst_percentage = to_decimal(gst_percentage, '0.00')
+    cess_percentage = to_decimal(cess_percentage, '0.00')
+    discount_amount = to_decimal(discount_amount, '0.00')
 
     # Line total before discount
     line_total = (selling_price * quantity).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)

@@ -59,7 +59,7 @@
         <div>
             <div><strong>Bill No:</strong> {{ invoice.invoice_number }}</div>
             <div><strong>Date:</strong> {{ invoice.invoice_date.strftime('%d-%b-%Y %I:%M %p') }}</div>
-            <div><strong>Cashier:</strong> {{ invoice.cashier.full_name }}</div>
+            <div><strong>Cashier:</strong> {{ invoice.cashier.full_name if invoice.cashier else 'Staff' }}</div>
             {% if invoice.customer %}
             <div><strong>Customer:</strong> {{ invoice.customer.name }} ({{ invoice.customer.phone }})</div>
             {% endif %}
@@ -95,7 +95,7 @@
                 <td>Subtotal:</td>
                 <td class="text-right">₹{{ invoice.subtotal }}</td>
             </tr>
-            {% if invoice.discount_amount > 0 %}
+            {% if invoice.discount_amount and invoice.discount_amount > 0 %}
             <tr>
                 <td>Discount:</td>
                 <td class="text-right">-₹{{ invoice.discount_amount }}</td>
@@ -120,7 +120,7 @@
                 <td class="text-right">₹{{ invoice.igst_total }}</td>
             </tr>
             {% endif %}
-            {% if invoice.round_off != 0 %}
+            {% if invoice.round_off and invoice.round_off != 0 %}
             <tr>
                 <td>Round Off:</td>
                 <td class="text-right">₹{{ invoice.round_off }}</td>

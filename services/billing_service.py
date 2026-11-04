@@ -11,6 +11,20 @@ from services.gst_service import calculate_item_tax, calculate_bill_taxes, round
 TWO_PLACES = Decimal('0.01')
 
 
+def to_decimal(val, default='0.00'):
+    """Safely convert a value to Decimal, returning default if None, empty, or invalid."""
+    if val is None or val == '' or val == 'null':
+        return Decimal(str(default))
+    try:
+        if isinstance(val, str):
+            val = val.strip()
+            if not val or val.lower() in ('none', 'null', 'nan'):
+                return Decimal(str(default))
+        return Decimal(str(val))
+    except Exception:
+        return Decimal(str(default))
+
+
 def lookup_product_by_barcode(barcode, store_id):
     """Find product by barcode."""
     product = Product.query.filter_by(
@@ -62,9 +76,9 @@ def calculate_cart_totals(cart_items, store):
             continue
 
         serial += 1
-        qty = Decimal(str(item.get('quantity', 1)))
-        item_discount_pct = Decimal(str(item.get('discount_percentage', 0)))
-        item_discount_amt = Decimal(str(item.get('discount_amount', 0)))
+        qty = to_decimal(item.get('quantity'), '1')
+        item_discount_pct = to_decimal(item.get('discount_percentage'), '0')
+        item_discount_amt = to_decimal(item.get('discount_amount'), '0')
 
         # Calculate line discount
         line_total = (product.selling_price * qty).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
@@ -186,9 +200,9 @@ def complete_sale(cart_items, payment_data, store, cashier, counter=None,
             raise ValueError(f"Product {item.get('product_name') or prod_id} not found or inactive")
 
         serial += 1
-        qty = Decimal(str(item.get('quantity', 1)))
-        item_discount_pct = Decimal(str(item.get('discount_percentage', 0)))
-        item_discount_amt = Decimal(str(item.get('discount_amount', 0)))
+        qty = to_decimal(item.get('quantity'), '1')
+        item_discount_pct = to_decimal(item.get('discount_percentage'), '0')
+        item_discount_amt = to_decimal(item.get('discount_amount'), '0')
 
         line_total = (product.selling_price * qty).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
 
@@ -237,8 +251,8 @@ def complete_sale(cart_items, payment_data, store, cashier, counter=None,
         items_to_deduct.append((product, qty))
 
     # Apply bill-level discount
-    bill_discount_pct = Decimal(str(bill_discount_pct))
-    bill_discount_amt = Decimal(str(bill_discount_amt))
+    bill_discount_pct = to_decimal(bill_discount_pct, '0')
+    bill_discount_amt = to_decimal(bill_discount_amt, '0')
     if bill_discount_pct > Decimal('0'):
         bill_discount_amt = (subtotal * bill_discount_pct / Decimal('100')).quantize(
             TWO_PLACES, rounding=ROUND_HALF_UP)
@@ -286,17 +300,37 @@ def complete_sale(cart_items, payment_data, store, cashier, counter=None,
 
     # Validate payment
     total_paid = Decimal('0.00')
+
+    # If single payment method, handle full-pay methods (UPI/Card/Cash) gracefully
+    if len(payment_data) == 1:
+        pd = payment_data[0]
+        method = pd.get('method', 'cash')
+        p_amt = to_decimal(pd.get('amount'), '0.00')
+        p_rec = to_decimal(pd.get('amount_received'), str(p_amt))
+
+        if method in ('upi', 'card'):
+            pd['amount'] = final_amount
+            pd['amount_received'] = final_amount
+            pd['change_returned'] = Decimal('0.00')
+        elif p_rec >= final_amount:
+            pd['amount'] = final_amount
+            pd['change_returned'] = p_rec - final_amount
+        elif abs(p_amt - final_amount) <= Decimal('0.50'):
+            pd['amount'] = final_amount
+
     for pd in payment_data:
-        pay_amount = Decimal(str(pd['amount']))
+        pay_amount = to_decimal(pd.get('amount'), '0.00')
+        amount_rec = to_decimal(pd.get('amount_received'), str(pay_amount))
+        change_ret = to_decimal(pd.get('change_returned'), '0.00')
         total_paid += pay_amount
 
         payment = Payment(
             store_id=store.id,
-            payment_method=pd['method'],
+            payment_method=pd.get('method', 'cash'),
             amount=pay_amount,
             reference_number=pd.get('reference', ''),
-            amount_received=Decimal(str(pd.get('amount_received', pay_amount))),
-            change_returned=Decimal(str(pd.get('change_returned', 0))),
+            amount_received=amount_rec,
+            change_returned=change_ret,
             status='completed',
         )
         invoice.payments.append(payment)

@@ -205,8 +205,8 @@
         </div>
 
         <!-- Pagination -->
-        <div class="card-footer bg-white border-top d-flex flex-wrap align-items-center justify-content-between py-3"
-             id="paginationContainer" style="display:none; border-radius: 0 0 12px 12px;">
+        <div class="card-footer bg-white border-top d-flex flex-wrap align-items-center justify-content-between py-3 d-none"
+             id="paginationContainer" style="border-radius: 0 0 12px 12px;">
             <div class="text-muted small" id="paginationInfo">
                 Showing 0 to 0 of 0 products
             </div>
@@ -612,7 +612,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tableSpinner.style.display = 'block';
         tableContainer.style.display = 'none';
         emptyState.style.display = 'none';
-        paginationContainer.style.display = 'none';
+        paginationContainer.classList.add('d-none');
 
         const params = new URLSearchParams({
             page: currentPage,
@@ -623,7 +623,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (statusFilter) params.append('status', statusFilter);
 
         fetch('/api/products?' + params.toString())
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) {
+                    throw new Error('Server returned HTTP ' + r.status);
+                }
+                return r.json();
+            })
             .then(data => {
                 tableSpinner.style.display = 'none';
 
@@ -636,13 +641,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     if (products.length === 0) {
                         emptyState.style.display = 'block';
+                        tableContainer.style.display = 'none';
+                        paginationContainer.classList.add('d-none');
                         return;
                     }
 
                     renderProducts(products);
                     renderPagination(total, totalPages);
                     tableContainer.style.display = 'block';
-                    paginationContainer.style.display = 'flex';
+                    paginationContainer.classList.remove('d-none');
                 } else {
                     emptyState.style.display = 'block';
                     productCount.textContent = 'Error loading products';
@@ -1559,7 +1566,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                bootstrap.Modal.getInstance(document.getElementById('newCategoryModal')).hide();
+                const catModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('newCategoryModal'));
+                if (catModal) catModal.hide();
                 loadCategories();
                 // Select the newly created category
                 setTimeout(() => {
@@ -1679,8 +1687,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function formatDecimal(value) {
-        if (value === null || value === undefined) return '0.00';
-        return parseFloat(value).toFixed(2);
+        if (value === null || value === undefined || value === '') return '0.00';
+        const num = parseFloat(value);
+        if (isNaN(num)) return '0.00';
+        return num.toFixed(2);
     }
 
     // ==========================================
