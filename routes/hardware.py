@@ -1,11 +1,13 @@
 """Hardware settings routes - scanner, printer, and camera configuration."""
-from functools import wraps
-from datetime import datetime, timezone
+from datetime import datetime
 
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
 
-from models import db, Store, HardwareSetting, AuditLog
+from models.base import db
+from models.store import Store
+from models.hardware import HardwareSetting
+from models.audit import AuditLog
 
 hardware_bp = Blueprint('hardware', __name__)
 

@@ -1,7 +1,6 @@
-﻿"""Invoice service - retrieval and PDF generation."""
+"""Invoice service - retrieval and PDF generation."""
 from decimal import Decimal
 from io import BytesIO
-from datetime import datetime
 
 try:
     from num2words import num2words
@@ -9,7 +8,6 @@ except ImportError:
     num2words = None
 
 from models.invoice import Invoice
-from models.store import Store
 
 
 def get_amount_in_words(amount):
@@ -42,7 +40,8 @@ def get_invoice_by_number(invoice_number, store_id=None):
 
 def get_invoice_by_id(invoice_id):
     """Get invoice by ID."""
-    return Invoice.query.get(invoice_id)
+    from models.base import db
+    return db.session.get(Invoice, invoice_id)
 
 
 def get_invoices(store_id, start_date=None, end_date=None, status=None,
@@ -73,7 +72,7 @@ def void_invoice(invoice_id, user_id, reason=''):
     from models.base import db
     from models.inventory import StockMovement
     
-    invoice = Invoice.query.get(invoice_id)
+    invoice = db.session.get(Invoice, invoice_id)
     if not invoice:
         raise ValueError("Invoice not found")
     if invoice.status == 'void':
@@ -110,12 +109,12 @@ def void_invoice(invoice_id, user_id, reason=''):
 def generate_invoice_pdf(invoice, store):
     """Generate a PDF invoice using ReportLab."""
     try:
-        from reportlab.lib.pagesizes import A4, mm
+        from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import mm as unit_mm
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
         from reportlab.lib import colors
-        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
     except ImportError:
         raise RuntimeError("reportlab is required for PDF generation")
 

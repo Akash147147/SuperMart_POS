@@ -1,15 +1,14 @@
 """Settings routes - store config, user management, and billing counters."""
 import os
 from functools import wraps
-from datetime import datetime, timezone
-
 from flask import Blueprint, request, jsonify, render_template, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
-from models import (
-    db, Store, BillingCounter, StoreSetting, User, Role, AuditLog,
-)
+from models.base import db
+from models.store import Store, BillingCounter
+from models.user import User, Role
+from models.audit import AuditLog
 
 settings_bp = Blueprint('settings', __name__)
 

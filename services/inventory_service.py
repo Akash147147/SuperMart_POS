@@ -1,6 +1,5 @@
 """Inventory management service."""
 from decimal import Decimal
-from datetime import datetime, timezone
 from models.base import db
 from models.product import Product
 from models.inventory import StockMovement
@@ -8,7 +7,7 @@ from models.inventory import StockMovement
 
 def stock_in(product_id, quantity, store_id, user_id, notes=''):
     """Add stock to a product."""
-    product = Product.query.get(product_id)
+    product = db.session.get(Product, product_id)
     if not product:
         raise ValueError(f"Product {product_id} not found")
 
@@ -34,7 +33,7 @@ def stock_in(product_id, quantity, store_id, user_id, notes=''):
 
 def stock_adjustment(product_id, new_quantity, store_id, user_id, reason=''):
     """Adjust stock to a specific quantity."""
-    product = Product.query.get(product_id)
+    product = db.session.get(Product, product_id)
     if not product:
         raise ValueError(f"Product {product_id} not found")
 
@@ -61,7 +60,7 @@ def stock_adjustment(product_id, new_quantity, store_id, user_id, reason=''):
 
 def record_damaged(product_id, quantity, store_id, user_id, notes=''):
     """Record damaged/wastage stock."""
-    product = Product.query.get(product_id)
+    product = db.session.get(Product, product_id)
     if not product:
         raise ValueError(f"Product {product_id} not found")
 

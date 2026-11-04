@@ -2,9 +2,10 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from functools import wraps
-from datetime import datetime, date, timedelta, timezone
-from decimal import Decimal
-from models import db, User, Role, Store, Product, Category, Invoice, InvoiceItem, Payment, AuditLog, StockMovement
+from datetime import datetime, timezone
+from models.base import db
+from models.user import User
+from models.audit import AuditLog
 
 auth_bp = Blueprint('auth', __name__)
 

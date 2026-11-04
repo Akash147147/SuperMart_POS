@@ -1,7 +1,13 @@
 """Automated tests for product, inventory, barcode, and billing workflows."""
+import sys
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 import unittest
 from decimal import Decimal
-from datetime import datetime, timezone
 from app import create_app
 from models.base import db
 from models.user import User, Role
@@ -131,7 +137,7 @@ class TestBillingAndInventory(unittest.TestCase):
         self.assertEqual(invoice.total_quantity, Decimal('3.000'))
 
         # Verify stock decreased by exactly 3
-        reloaded_prod = Product.query.get(self.product.id)
+        reloaded_prod = db.session.get(Product, self.product.id)
         self.assertEqual(reloaded_prod.stock_quantity, initial_stock - Decimal('3.000'))
 
         # Verify stock movement record created
@@ -164,7 +170,7 @@ class TestBillingAndInventory(unittest.TestCase):
             )
 
         # Stock must remain unchanged
-        reloaded_prod = Product.query.get(self.product.id)
+        reloaded_prod = db.session.get(Product, self.product.id)
         self.assertEqual(reloaded_prod.stock_quantity, initial_stock)
 
     def test_stock_in_and_adjustment(self):
@@ -177,6 +183,14 @@ class TestBillingAndInventory(unittest.TestCase):
 
         p3 = record_damaged(self.product.id, 2, self.store.id, self.cashier.id, notes='Broken seal')
         self.assertEqual(p3.stock_quantity, Decimal('63.000'))
+
+    def test_barcode_service(self):
+        """Test barcode cleaning, validation and format identification."""
+        cleaned = clean_barcode("  8901234567890 \r\n")
+        self.assertEqual(cleaned, "8901234567890")
+        self.assertEqual(identify_barcode_format("8901234567890"), "EAN-13")
+        self.assertTrue(validate_ean13_checksum("8901234567890"))
+        self.assertFalse(validate_ean13_checksum("8901234567899"))
 
 
 if __name__ == '__main__':

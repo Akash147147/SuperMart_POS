@@ -1,4 +1,11 @@
 """Unit tests for GST calculation service."""
+import sys
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 import unittest
 from decimal import Decimal
 from services.gst_service import calculate_item_tax, calculate_bill_taxes, round_to_nearest
@@ -69,6 +76,15 @@ class TestGSTService(unittest.TestCase):
         rounded2, diff2 = round_to_nearest(Decimal('159.60'))
         self.assertEqual(rounded2, Decimal('160.00'))
         self.assertEqual(diff2, Decimal('0.40'))
+
+    def test_bill_taxes_aggregation(self):
+        item1 = calculate_item_tax(selling_price=Decimal('100.00'), quantity=Decimal('1'), gst_percentage=Decimal('18.00'), tax_type='intra-state')
+        item2 = calculate_item_tax(selling_price=Decimal('200.00'), quantity=Decimal('1'), gst_percentage=Decimal('5.00'), tax_type='intra-state')
+        bill_tax = calculate_bill_taxes([item1, item2])
+        self.assertEqual(bill_tax['total_taxable'], Decimal('300.00'))
+        self.assertEqual(bill_tax['total_cgst'], Decimal('14.00'))
+        self.assertEqual(bill_tax['total_sgst'], Decimal('14.00'))
+        self.assertEqual(bill_tax['total_tax'], Decimal('28.00'))
 
 
 if __name__ == '__main__':

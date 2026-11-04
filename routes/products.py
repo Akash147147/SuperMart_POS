@@ -7,7 +7,6 @@ from flask import Blueprint, request, jsonify, render_template, Response
 from flask_login import login_required, current_user
 from models.base import db
 from models.product import Product, Category
-from models.store import Store
 
 products_bp = Blueprint('products', __name__)
 

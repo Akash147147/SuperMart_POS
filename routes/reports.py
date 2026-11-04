@@ -1,16 +1,17 @@
 """Reports routes - sales, GST, inventory, and analytics reports."""
 from functools import wraps
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date
 from decimal import Decimal
 
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
-from sqlalchemy import func, extract, cast, Date
+from sqlalchemy import func, cast, Date
 
-from models import (
-    db, Store, Product, Category, Invoice, InvoiceItem, InvoiceTax,
-    Payment, AuditLog,
-)
+from models.base import db
+from models.store import Store
+from models.product import Product, Category
+from models.invoice import Invoice, InvoiceItem, InvoiceTax
+from models.payment import Payment
 from services.inventory_service import get_low_stock_products
 
 reports_bp = Blueprint('reports', __name__)

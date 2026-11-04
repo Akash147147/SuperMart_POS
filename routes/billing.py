@@ -1,12 +1,12 @@
 """Billing counter routes - barcode scanning, cart, and invoice creation."""
-import json
 from functools import wraps
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
-from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
-from models import db, Product, Store, Customer, HeldBill
+from models.base import db
+from models.store import Store
+from models.held_bill import HeldBill
 from services.billing_service import (
     lookup_product_by_barcode,
     search_products,

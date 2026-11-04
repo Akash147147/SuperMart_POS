@@ -5,7 +5,6 @@ from models.base import db
 from models.product import Product
 from models.invoice import Invoice, InvoiceItem, InvoiceTax
 from models.payment import Payment
-from models.store import Store
 from models.inventory import StockMovement
 from services.gst_service import calculate_item_tax, calculate_bill_taxes, round_to_nearest
 
@@ -50,7 +49,7 @@ def calculate_cart_totals(cart_items, store):
     serial = 0
 
     for item in cart_items:
-        product = Product.query.get(item['product_id'])
+        product = db.session.get(Product, item['product_id'])
         if not product:
             continue
 
@@ -166,7 +165,7 @@ def complete_sale(cart_items, payment_data, store, cashier, counter=None,
     items_to_deduct = []  # (product, quantity) pairs
 
     for item in cart_items:
-        product = Product.query.get(item['product_id'])
+        product = db.session.get(Product, item['product_id'])
         if not product or not product.is_active:
             raise ValueError(f"Product {item['product_id']} not found or inactive")
 

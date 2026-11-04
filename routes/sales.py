@@ -2,7 +2,6 @@
 from functools import wraps
 from flask import Blueprint, request, jsonify, render_template, send_file
 from flask_login import login_required, current_user
-from models.base import db
 from models.store import Store
 from services.invoice_service import (
     get_invoice_by_id, get_invoices, void_invoice, generate_invoice_pdf, get_amount_in_words

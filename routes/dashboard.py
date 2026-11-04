@@ -1,11 +1,11 @@
 """Dashboard routes."""
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, session
-from flask_login import login_user, logout_user, login_required, current_user
-from functools import wraps
+from flask import Blueprint, jsonify, render_template
+from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta, timezone
-from decimal import Decimal
-from sqlalchemy import func, cast, Date, case, extract
-from models import db, User, Role, Store, Product, Category, Invoice, InvoiceItem, Payment, AuditLog, StockMovement
+from sqlalchemy import func
+from models.base import db
+from models.product import Product
+from models.invoice import Invoice, InvoiceItem
 
 dashboard_bp = Blueprint('dashboard', __name__)
 

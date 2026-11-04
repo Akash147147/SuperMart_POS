@@ -1,11 +1,11 @@
 """Customer management routes."""
-from datetime import datetime, timezone
-
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 
-from models import db, Customer, AuditLog
+from models.base import db
+from models.customer import Customer
+from models.audit import AuditLog
 
 customers_bp = Blueprint('customers', __name__)
 

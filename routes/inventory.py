@@ -1,9 +1,7 @@
 """Inventory routes and management."""
-from decimal import Decimal
 from functools import wraps
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
-from models.base import db
 from models.product import Product
 from services.inventory_service import (
     stock_in, stock_adjustment, record_damaged,
