@@ -1,13 +1,20 @@
 """Customer management routes."""
 from datetime import datetime, timezone
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 
 from models import db, Customer, AuditLog
 
 customers_bp = Blueprint('customers', __name__)
+
+
+@customers_bp.route('/customers')
+@login_required
+def customers_page():
+    """Customer management HTML page."""
+    return render_template('customers.html')
 
 
 def _log_audit(action, entity_type=None, entity_id=None, details=None):
@@ -233,6 +240,29 @@ def update_customer(customer_id):
             'message': 'Customer updated successfully',
             'data': customer.to_dict(),
         })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Delete / Deactivate customer
+# ---------------------------------------------------------------------------
+
+@customers_bp.route('/api/customers/<int:customer_id>', methods=['DELETE'])
+@login_required
+def delete_customer(customer_id):
+    """Soft delete / deactivate a customer."""
+    try:
+        customer = Customer.query.get(customer_id)
+        if not customer or customer.store_id != current_user.store_id:
+            return jsonify({'success': False, 'message': 'Customer not found'}), 404
+
+        customer.is_active = False
+        _log_audit('delete_customer', 'customer', customer.id, {'name': customer.name})
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Customer deleted successfully'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500

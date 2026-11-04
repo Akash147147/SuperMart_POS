@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Management - SuperMart POS{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-1"><i class="bi bi-people text-primary"></i> Customer Directory & Accounts</h4>
+        <p class="text-muted fs-sm mb-0">Manage regular supermarket customers, retail credit, and contact profiles.</p>
+    </div>
+    <button class="btn btn-primary" onclick="openAddCustomerModal()">
+        <i class="bi bi-person-plus me-1"></i> Add New Customer
+    </button>
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="card-section p-3 mb-3">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-5">
+            <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="cust-search-input" class="form-control" placeholder="Search by customer name, phone number, or email...">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-outline-secondary w-100" onclick="loadCustomers(1)">
+                <i class="bi bi-arrow-repeat me-1"></i> Refresh
+            </button>
+        </div>
+        <div class="col-md-5 text-end text-muted fs-sm" id="customer-count-badge">
+            Loading customers...
+        </div>
+    </div>
+</div>
+
+<!-- Customers Table -->
+<div class="card-section">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>Customer Name</th>
+                    <th>Phone Number</th>
+                    <th>Email</th>
+                    <th>Address</th>
+                    <th>GSTIN</th>
+                    <th style="width: 140px;" class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="customers-tbody">
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                        Loading customer records...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="p-3 d-flex justify-content-between align-items-center border-top" id="pagination-wrapper" style="display: none !important;">
+        <span class="text-muted fs-sm" id="pagination-info"></span>
+        <div class="btn-group btn-group-sm" id="pagination-buttons"></div>
+    </div>
+</div>
+
+<!-- Add / Edit Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-navy text-white">
+                <h5 class="modal-title" id="customerModalTitle">Add Customer</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="customer-form" onsubmit="saveCustomer(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="cust-id">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Full Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="cust-name" required placeholder="e.g. Ramesh Kumar">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Phone Number</label>
+                        <input type="tel" class="form-control" id="cust-phone" placeholder="e.g. 9876543210">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="cust-email" placeholder="e.g. ramesh@example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Billing Address</label>
+                        <textarea class="form-control" id="cust-address" rows="2" placeholder="Street, landmark, pincode..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">GSTIN (For Business Customers)</label>
+                        <input type="text" class="form-control" id="cust-gstin" placeholder="15-character GSTIN">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-cust">
+                        <i class="bi bi-save me-1"></i> Save Customer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Customer History & Profile Modal -->
+<div class="modal fade" id="customerHistoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clock-history me-1"></i> Customer Profile & History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="p-3 bg-light rounded mb-3">
+                    <h5 class="fw-bold mb-1" id="history-cust-name">-</h5>
+                    <p class="text-muted fs-sm mb-1" id="history-cust-contact">-</p>
+                    <div class="row g-2 mt-2">
+                        <div class="col-6">
+                            <div class="card p-2 text-center bg-white border">
+                                <span class="text-muted fs-sm">Total Invoices</span>
+                                <h4 class="fw-bold text-primary m-0" id="history-total-invoices">0</h4>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card p-2 text-center bg-white border">
+                                <span class="text-muted fs-sm">Total Spent</span>
+                                <h4 class="fw-bold text-success m-0" id="history-total-spent">₹0.00</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <a href="/sales" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-receipt me-1"></i> View Sales Ledger
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+const customerModal = new bootstrap.Modal(document.getElementById('customerModal'));
+const historyModal = new bootstrap.Modal(document.getElementById('customerHistoryModal'));
+
+let currentCustomers = [];
+let currentPage = 1;
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadCustomers(1);
+
+    // Live search debounced
+    let searchTimeout = null;
+    document.getElementById('cust-search-input').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            loadCustomers(1);
+        }, 350);
+    });
+});
+
+function loadCustomers(page = 1) {
+    currentPage = page;
+    const query = document.getElementById('cust-search-input').value.trim();
+    const url = `/api/customers?page=${page}&q=${encodeURIComponent(query)}`;
+
+    fetch(url)
+    .then(r => r.json())
+    .then(res => {
+        const tbody = document.getElementById('customers-tbody');
+        tbody.innerHTML = '';
+
+        if (res.success && res.data) {
+            currentCustomers = res.data;
+            const pagination = res.pagination || { total: res.data.length, page: 1, pages: 1 };
+
+            document.getElementById('customer-count-badge').textContent = `Total: ${pagination.total} customer${pagination.total !== 1 ? 's' : ''}`;
+
+            if (res.data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="bi bi-people fs-1 d-block mb-2 opacity-50"></i>
+                            No customer records found. Click <strong>"Add New Customer"</strong> to create one.
+                        </td>
+                    </tr>`;
+                document.getElementById('pagination-wrapper').style.setProperty('display', 'none', 'important');
+                return;
+            }
+
+            res.data.forEach((c, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-muted">${(page - 1) * 20 + idx + 1}</td>
+                    <td class="fw-bold">${escapeHtml(c.name)}</td>
+                    <td>${c.phone ? `<i class="bi bi-telephone text-muted me-1"></i>${escapeHtml(c.phone)}` : '<span class="text-muted">-</span>'}</td>
+                    <td>${c.email ? `<i class="bi bi-envelope text-muted me-1"></i>${escapeHtml(c.email)}` : '<span class="text-muted">-</span>'}</td>
+                    <td class="text-truncate" style="max-width: 180px;">${c.address ? escapeHtml(c.address) : '<span class="text-muted">-</span>'}</td>
+                    <td>${c.gstin ? `<span class="badge bg-light text-dark border">${escapeHtml(c.gstin)}</span>` : '<span class="text-muted">-</span>'}</td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-info" onclick="viewHistory(${c.id})" title="View Profile & Invoices">
+                                <i class="bi bi-clock-history"></i>
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="editCustomer(${c.id})" title="Edit Details">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteCustomer(${c.id}, '${escapeHtml(c.name)}')" title="Delete Customer">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Pagination setup
+            if (pagination.pages > 1) {
+                document.getElementById('pagination-wrapper').style.setProperty('display', 'flex', 'important');
+                document.getElementById('pagination-info').innerText = `Page ${pagination.page} of ${pagination.pages} (${pagination.total} records)`;
+                const btnGroup = document.getElementById('pagination-buttons');
+                btnGroup.innerHTML = `
+                    <button class="btn btn-outline-secondary" ${pagination.page <= 1 ? 'disabled' : ''} onclick="loadCustomers(${pagination.page - 1})">Prev</button>
+                    <button class="btn btn-outline-secondary" ${pagination.page >= pagination.pages ? 'disabled' : ''} onclick="loadCustomers(${pagination.page + 1})">Next</button>
+                `;
+            } else {
+                document.getElementById('pagination-wrapper').style.setProperty('display', 'none', 'important');
+            }
+        }
+    })
+    .catch(err => {
+        document.getElementById('customers-tbody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error loading customers: ${err.message}</td></tr>`;
+    });
+}
+
+function openAddCustomerModal() {
+    document.getElementById('customerModalTitle').innerText = 'Add New Customer';
+    document.getElementById('cust-id').value = '';
+    document.getElementById('cust-name').value = '';
+    document.getElementById('cust-phone').value = '';
+    document.getElementById('cust-email').value = '';
+    document.getElementById('cust-address').value = '';
+    document.getElementById('cust-gstin').value = '';
+    customerModal.show();
+}
+
+function editCustomer(id) {
+    const cust = currentCustomers.find(c => c.id === id);
+    if (!cust) return;
+
+    document.getElementById('customerModalTitle').innerText = 'Edit Customer';
+    document.getElementById('cust-id').value = cust.id;
+    document.getElementById('cust-name').value = cust.name || '';
+    document.getElementById('cust-phone').value = cust.phone || '';
+    document.getElementById('cust-email').value = cust.email || '';
+    document.getElementById('cust-address').value = cust.address || '';
+    document.getElementById('cust-gstin').value = cust.gstin || '';
+    customerModal.show();
+}
+
+function saveCustomer(e) {
+    e.preventDefault();
+    const id = document.getElementById('cust-id').value;
+    const payload = {
+        name: document.getElementById('cust-name').value.trim(),
+        phone: document.getElementById('cust-phone').value.trim(),
+        email: document.getElementById('cust-email').value.trim(),
+        address: document.getElementById('cust-address').value.trim(),
+        gstin: document.getElementById('cust-gstin').value.trim()
+    };
+
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/customers/${id}` : '/api/customers';
+
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            customerModal.hide();
+            loadCustomers(currentPage);
+        } else {
+            alert(res.message || 'Error saving customer');
+        }
+    })
+    .catch(err => alert('Network error: ' + err.message));
+}
+
+function deleteCustomer(id, name) {
+    if (!confirm(`Are you sure you want to deactivate customer "${name}"?`)) return;
+
+    fetch(`/api/customers/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': csrfToken }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            loadCustomers(currentPage);
+        } else {
+            alert(res.message || 'Error deleting customer');
+        }
+    });
+}
+
+function viewHistory(id) {
+    fetch(`/api/customers/${id}`)
+    .then(r => r.json())
+    .then(res => {
+        if (res.success && res.data) {
+            const d = res.data;
+            document.getElementById('history-cust-name').innerText = d.name;
+            document.getElementById('history-cust-contact').innerText = `Phone: ${d.phone || 'N/A'} | Email: ${d.email || 'N/A'} | GSTIN: ${d.gstin || 'N/A'}`;
+            document.getElementById('history-total-invoices').innerText = d.total_invoices || 0;
+            document.getElementById('history-total-spent').innerText = '₹' + Number(d.total_spent || 0).toFixed(2);
+            historyModal.show();
+        }
+    });
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

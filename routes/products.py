@@ -100,8 +100,39 @@ def list_products():
         'products': [p.to_dict() for p in pagination.items],
         'total': pagination.total,
         'pages': pagination.pages,
+        'total_pages': pagination.pages,
         'current_page': pagination.page
     })
+
+
+@products_bp.route('/api/products/check-barcode', methods=['GET'])
+@login_required
+def check_barcode():
+    store_id = current_user.store_id or 1
+    barcode = request.args.get('barcode', '').strip()
+    exclude_id = request.args.get('exclude_id', type=int)
+    if not barcode:
+        return jsonify({'exists': False})
+
+    query = Product.query.filter_by(store_id=store_id, barcode=barcode)
+    if exclude_id:
+        query = query.filter(Product.id != exclude_id)
+
+    exists = query.first() is not None
+    return jsonify({'exists': exists})
+
+
+@products_bp.route('/api/products/<int:id>/status', methods=['PUT'])
+@login_required
+@admin_required
+def update_product_status(id):
+    product = Product.query.get_or_404(id)
+    data = request.get_json() or {}
+    if 'is_active' in data:
+        product.is_active = bool(data['is_active'])
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Product status updated', 'product': product.to_dict()})
+    return jsonify({'success': False, 'message': 'is_active field required'}), 400
 
 
 @products_bp.route('/api/products/<int:id>', methods=['GET'])

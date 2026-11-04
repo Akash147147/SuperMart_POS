@@ -329,7 +329,7 @@
             <ul class="nav flex-column">
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint and request.endpoint.startswith('products') %}active{% endif %}"
-                       href="{{ url_for('products.list_products') }}">
+                       href="{{ url_for('products.products_page') }}">
                         <i class="bi bi-box-seam"></i>
                         <span>Products</span>
                     </a>
@@ -363,7 +363,7 @@
                 {% endif %}
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint and request.endpoint.startswith('customers') %}active{% endif %}"
-                       href="{{ url_for('customers.list_customers') }}">
+                       href="{{ url_for('customers.customers_page') }}">
                         <i class="bi bi-people"></i>
                         <span>Customers</span>
                     </a>

@@ -102,19 +102,43 @@ def dashboard_stats():
 
     # ---------- Daily Sales Chart (Last 7 Days) ----------
     daily_sales_chart = _get_daily_sales(store_id, days=7)
+    daily_sales_list = [
+        {'date': label, 'total': val, 'count': cnt}
+        for label, val, cnt in zip(daily_sales_chart['labels'], daily_sales_chart['values'], daily_sales_chart['counts'])
+    ]
 
     # ---------- Monthly Sales Chart (Last 6 Months) ----------
     monthly_sales_chart = _get_monthly_sales(store_id, months=6)
+    monthly_sales_list = [
+        {'month': label, 'total': val, 'count': cnt}
+        for label, val, cnt in zip(monthly_sales_chart['labels'], monthly_sales_chart['values'], monthly_sales_chart['counts'])
+    ]
 
     return jsonify({
         'success': True,
+        'today_sales': today_sales,
+        'today_bills': today_bills,
+        'bills_generated': today_bills,
+        'today_products_sold': today_products_sold,
+        'products_sold': today_products_sold,
+        'low_stock_count': low_stock_count,
+        'top_products': top_products,
+        'recent_transactions': recent_transactions,
+        'daily_sales': daily_sales_list,
+        'monthly_sales': monthly_sales_list,
+        'daily_sales_chart': daily_sales_chart,
+        'monthly_sales_chart': monthly_sales_chart,
         'data': {
             'today_sales': today_sales,
             'today_bills': today_bills,
+            'bills_generated': today_bills,
             'today_products_sold': today_products_sold,
+            'products_sold': today_products_sold,
             'low_stock_count': low_stock_count,
             'top_products': top_products,
             'recent_transactions': recent_transactions,
+            'daily_sales': daily_sales_list,
+            'monthly_sales': monthly_sales_list,
             'daily_sales_chart': daily_sales_chart,
             'monthly_sales_chart': monthly_sales_chart,
         },
