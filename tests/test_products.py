@@ -101,6 +101,36 @@ class TestProductBarcodeAPIs(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(resp.get_json()['exists'])
 
+    def test_create_and_update_product_null_purchase_price(self):
+        """Verify product can be created and updated when purchase_price is null, empty string, or missing."""
+        payload = {
+            'name': 'Sample Tea 250g',
+            'barcode': '8901234500001',
+            'mrp': 120.0,
+            'selling_price': 110.0,
+            'purchase_price': None,  # triggers [<class 'decimal.ConversionSyntax'>] if not handled safely
+            'gst_percentage': 18.0,
+            'cess_percentage': None,
+            'stock_quantity': 20,
+            'min_stock_level': 10,
+            'unit': 'pcs'
+        }
+        resp = self.client.post('/api/products', json=payload)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data['success'])
+        prod_id = data['product']['id']
+
+        # Update with empty string purchase_price
+        update_payload = {
+            'purchase_price': '',
+            'selling_price': 105.0
+        }
+        resp = self.client.put(f'/api/products/{prod_id}', json=update_payload)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()['success'])
+
 
 if __name__ == '__main__':
     unittest.main()
+

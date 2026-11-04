@@ -11,6 +11,20 @@ from models.product import Product, Category
 products_bp = Blueprint('products', __name__)
 
 
+def to_decimal(val, default='0.00'):
+    """Safely convert a value to Decimal, returning default if None, empty, or invalid."""
+    if val is None or val == '' or val == 'null':
+        return Decimal(str(default))
+    try:
+        if isinstance(val, str):
+            val = val.strip()
+            if not val or val.lower() in ('none', 'null', 'nan'):
+                return Decimal(str(default))
+        return Decimal(str(val))
+    except Exception:
+        return Decimal(str(default))
+
+
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -192,14 +206,14 @@ def create_product():
             brand=data.get('brand'),
             size_weight=data.get('size_weight'),
             unit=data.get('unit', 'pcs'),
-            mrp=Decimal(str(data.get('mrp', '0'))),
-            selling_price=Decimal(str(data.get('selling_price', '0'))),
-            purchase_price=Decimal(str(data.get('purchase_price', '0'))),
-            gst_percentage=Decimal(str(data.get('gst_percentage', '0'))),
-            cess_percentage=Decimal(str(data.get('cess_percentage', '0'))),
+            mrp=to_decimal(data.get('mrp'), '0.00'),
+            selling_price=to_decimal(data.get('selling_price'), '0.00'),
+            purchase_price=to_decimal(data.get('purchase_price'), '0.00'),
+            gst_percentage=to_decimal(data.get('gst_percentage'), '0.00'),
+            cess_percentage=to_decimal(data.get('cess_percentage'), '0.00'),
             is_gst_exempt=bool(data.get('is_gst_exempt', False)),
-            stock_quantity=Decimal(str(data.get('stock_quantity', '0'))),
-            min_stock_level=Decimal(str(data.get('min_stock_level', '5'))),
+            stock_quantity=to_decimal(data.get('stock_quantity'), '0.000'),
+            min_stock_level=to_decimal(data.get('min_stock_level'), '5.000'),
             sold_by_weight=bool(data.get('sold_by_weight', False)),
             is_active=bool(data.get('is_active', True))
         )
@@ -244,21 +258,21 @@ def update_product(id):
     if 'unit' in data:
         product.unit = data['unit']
     if 'mrp' in data:
-        product.mrp = Decimal(str(data['mrp']))
+        product.mrp = to_decimal(data['mrp'], product.mrp or '0.00')
     if 'selling_price' in data:
-        product.selling_price = Decimal(str(data['selling_price']))
+        product.selling_price = to_decimal(data['selling_price'], product.selling_price or '0.00')
     if 'purchase_price' in data:
-        product.purchase_price = Decimal(str(data['purchase_price']))
+        product.purchase_price = to_decimal(data['purchase_price'], '0.00')
     if 'gst_percentage' in data:
-        product.gst_percentage = Decimal(str(data['gst_percentage']))
+        product.gst_percentage = to_decimal(data['gst_percentage'], '0.00')
     if 'cess_percentage' in data:
-        product.cess_percentage = Decimal(str(data['cess_percentage']))
+        product.cess_percentage = to_decimal(data['cess_percentage'], '0.00')
     if 'is_gst_exempt' in data:
         product.is_gst_exempt = bool(data['is_gst_exempt'])
     if 'stock_quantity' in data:
-        product.stock_quantity = Decimal(str(data['stock_quantity']))
+        product.stock_quantity = to_decimal(data['stock_quantity'], product.stock_quantity or '0.000')
     if 'min_stock_level' in data:
-        product.min_stock_level = Decimal(str(data['min_stock_level']))
+        product.min_stock_level = to_decimal(data['min_stock_level'], product.min_stock_level or '5.000')
     if 'sold_by_weight' in data:
         product.sold_by_weight = bool(data['sold_by_weight'])
     if 'is_active' in data:
@@ -361,12 +375,12 @@ def import_products():
                 brand=row.get('brand') or row.get('Brand') or '',
                 size_weight=row.get('size_weight') or row.get('Size/Weight') or '',
                 unit=row.get('unit') or row.get('Unit') or 'pcs',
-                mrp=Decimal(str(row.get('mrp') or row.get('MRP') or '0')),
-                selling_price=Decimal(str(row.get('selling_price') or row.get('Selling Price') or '0')),
-                purchase_price=Decimal(str(row.get('purchase_price') or row.get('Purchase Price') or '0')),
-                gst_percentage=Decimal(str(row.get('gst_percentage') or row.get('GST %') or '0')),
-                stock_quantity=Decimal(str(row.get('stock_quantity') or row.get('Stock') or '0')),
-                min_stock_level=Decimal(str(row.get('min_stock_level') or row.get('Min Stock') or '5')),
+                mrp=to_decimal(row.get('mrp') or row.get('MRP'), '0.00'),
+                selling_price=to_decimal(row.get('selling_price') or row.get('Selling Price'), '0.00'),
+                purchase_price=to_decimal(row.get('purchase_price') or row.get('Purchase Price'), '0.00'),
+                gst_percentage=to_decimal(row.get('gst_percentage') or row.get('GST %'), '0.00'),
+                stock_quantity=to_decimal(row.get('stock_quantity') or row.get('Stock'), '0.000'),
+                min_stock_level=to_decimal(row.get('min_stock_level') or row.get('Min Stock'), '5.000'),
                 is_active=True
             )
             db.session.add(p)

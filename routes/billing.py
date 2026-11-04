@@ -17,6 +17,20 @@ from services.billing_service import (
 billing_bp = Blueprint('billing', __name__)
 
 
+def to_decimal(val, default='0.00'):
+    """Safely convert a value to Decimal, returning default if None, empty, or invalid."""
+    if val is None or val == '' or val == 'null':
+        return Decimal(str(default))
+    try:
+        if isinstance(val, str):
+            val = val.strip()
+            if not val or val.lower() in ('none', 'null', 'nan'):
+                return Decimal(str(default))
+        return Decimal(str(val))
+    except Exception:
+        return Decimal(str(default))
+
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -115,8 +129,8 @@ def complete():
     cart_items = data.get('cart_items', [])
     payment_data = data.get('payment_data', [])
     customer_id = data.get('customer_id')
-    bill_discount_pct = Decimal(str(data.get('bill_discount_pct', 0)))
-    bill_discount_amt = Decimal(str(data.get('bill_discount_amt', 0)))
+    bill_discount_pct = to_decimal(data.get('bill_discount_pct'), '0')
+    bill_discount_amt = to_decimal(data.get('bill_discount_amt'), '0')
     notes = data.get('notes', '')
 
     # --- Validations ---
