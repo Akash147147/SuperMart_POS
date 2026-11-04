@@ -8,7 +8,7 @@ load_dotenv()
 
 class Config:
     """Base configuration."""
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'supermart-secure-pos-key-2026-prod-jwt-secret')
     
     # Database configuration
     DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -53,7 +53,7 @@ class Config:
     
     # WTF CSRF
     WTF_CSRF_ENABLED = True
-    WTF_CSRF_TIME_LIMIT = 3600
+    WTF_CSRF_TIME_LIMIT = None  # Valid for the entire life of the session (prevents 1-hour expiration)
     
     # Upload
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB

@@ -77,6 +77,27 @@ def create_app(config_name=None):
             'app_name': 'SuperMart POS',
         }
 
+    # CSRF error handler and refresh endpoint
+    from flask_wtf.csrf import CSRFError, generate_csrf
+    from flask import request, redirect, flash, jsonify
+
+    @app.route('/api/csrf-token', methods=['GET'])
+    def get_csrf_token():
+        """Provide a fresh CSRF token for active sessions."""
+        return jsonify({'success': True, 'csrf_token': generate_csrf()})
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(e):
+        """Gracefully handle expired or invalid CSRF tokens."""
+        if request.is_json or request.path.startswith('/api/'):
+            return jsonify({
+                'success': False,
+                'message': 'Your session token has expired. Please refresh the page.',
+                'csrf_expired': True
+            }), 400
+        flash('Your session expired. Please log in again to continue.', 'warning')
+        return redirect('/login')
+
     # Error handlers
     @app.errorhandler(404)
     def not_found(e):
