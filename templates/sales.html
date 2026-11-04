@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Sales History - SuperMart POS{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-3">
+    <h4><i class="bi bi-clock-history"></i> Sales & Transaction History</h4>
+    <a href="{{ url_for('billing.billing_page') }}" class="btn btn-success btn-sm">
+        <i class="bi bi-cart-plus"></i> New Bill
+    </a>
+</div>
+
+<div class="card-section p-3 mb-3">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-3">
+            <input type="text" id="filter-search" class="form-control form-control-sm" placeholder="Search Invoice #">
+        </div>
+        <div class="col-md-2">
+            <select id="filter-status" class="form-select form-select-sm">
+                <option value="">All Statuses</option>
+                <option value="completed">Completed</option>
+                <option value="void">Void</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select id="filter-payment" class="form-select form-select-sm">
+                <option value="">All Payments</option>
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="card">Card</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary btn-sm w-100" onclick="loadInvoices(1)">Filter</button>
+        </div>
+    </div>
+</div>
+
+<div class="card-section">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Date & Time</th>
+                    <th>Cashier</th>
+                    <th>Customer</th>
+                    <th>Items</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="invoices-tbody">
+                <tr><td colspan="8" class="text-center py-4">Loading invoices...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="p-3 d-flex justify-content-between align-items-center" id="pagination-controls"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+
+function loadInvoices(page = 1) {
+    currentPage = page;
+    const status = document.getElementById('filter-status').value;
+    const payment = document.getElementById('filter-payment').value;
+
+    fetch(`/api/sales/invoices?page=${page}&status=${status}&payment_method=${payment}`)
+    .then(r => r.json())
+    .then(res => {
+        const tbody = document.getElementById('invoices-tbody');
+        tbody.innerHTML = '';
+        if (res.success && res.invoices.length > 0) {
+            res.invoices.forEach(inv => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="fw-bold">${inv.invoice_number}</td>
+                    <td>${new Date(inv.invoice_date).toLocaleString()}</td>
+                    <td>${inv.cashier_name}</td>
+                    <td>${inv.customer ? inv.customer.name : 'Walk-in'}</td>
+                    <td>${inv.total_items} items</td>
+                    <td class="fw-bold text-success">₹${inv.final_amount}</td>
+                    <td><span class="badge ${inv.status === 'completed' ? 'bg-success' : 'bg-danger'}">${inv.status}</span></td>
+                    <td>
+                        <a href="/api/sales/invoice/${inv.id}/receipt" target="_blank" class="btn btn-sm btn-outline-primary" title="Print Receipt">
+                            <i class="bi bi-printer"></i>
+                        </a>
+                        <a href="/api/sales/invoice/${inv.id}/pdf" target="_blank" class="btn btn-sm btn-outline-danger" title="Download PDF">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                        </a>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            renderPagination(res.current_page, res.pages);
+        } else {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No records found</td></tr>';
+            document.getElementById('pagination-controls').innerHTML = '';
+        }
+    });
+}
+
+function renderPagination(current, total) {
+    const wrap = document.getElementById('pagination-controls');
+    wrap.innerHTML = `
+        <span class="text-muted fs-sm">Page ${current} of ${total}</span>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" ${current <= 1 ? 'disabled' : ''} onclick="loadInvoices(${current - 1})">Prev</button>
+            <button class="btn btn-outline-secondary" ${current >= total ? 'disabled' : ''} onclick="loadInvoices(${current + 1})">Next</button>
+        </div>
+    `;
+}
+
+document.addEventListener('DOMContentLoaded', () => loadInvoices(1));
+</script>
+{% endblock %}
+

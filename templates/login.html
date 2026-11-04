@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — SuperMart POS</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/bootstrap.min.css') }}"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css';">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/bootstrap-icons.min.css') }}"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';">
+
+    <style>
+        :root {
+            --navy: #1a2744;
+            --navy-light: #243456;
+            --green: #28a745;
+            --green-hover: #218838;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            background: var(--navy);
+        }
+
+        /* ===== Left branding panel ===== */
+        .login-brand {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+            color: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-brand::before {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: rgba(40, 167, 69, 0.08);
+            top: -150px;
+            right: -150px;
+        }
+
+        .login-brand::after {
+            content: '';
+            position: absolute;
+            width: 350px;
+            height: 350px;
+            border-radius: 50%;
+            background: rgba(40, 167, 69, 0.06);
+            bottom: -100px;
+            left: -100px;
+        }
+
+        .brand-icon {
+            width: 90px;
+            height: 90px;
+            background: var(--green);
+            border-radius: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.6rem;
+            color: #fff;
+            margin-bottom: 28px;
+            box-shadow: 0 8px 32px rgba(40, 167, 69, 0.35);
+        }
+
+        .brand-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 10px;
+        }
+
+        .brand-subtitle {
+            font-size: 1rem;
+            opacity: 0.65;
+            text-align: center;
+            max-width: 320px;
+            line-height: 1.6;
+        }
+
+        .brand-features {
+            margin-top: 48px;
+            list-style: none;
+            padding: 0;
+        }
+
+        .brand-features li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            font-size: 0.92rem;
+            opacity: 0.7;
+        }
+
+        .brand-features li i {
+            color: var(--green);
+            font-size: 1.1rem;
+        }
+
+        /* ===== Right form panel ===== */
+        .login-form-panel {
+            width: 480px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 60px 50px;
+            background: #ffffff;
+        }
+
+        .login-heading {
+            font-size: 1.65rem;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 6px;
+        }
+
+        .login-subheading {
+            font-size: 0.92rem;
+            color: #6c757d;
+            margin-bottom: 32px;
+        }
+
+        /* Input groups */
+        .form-floating-icon {
+            position: relative;
+        }
+
+        .form-floating-icon .form-control {
+            padding-left: 44px;
+            height: 52px;
+            border-radius: 8px;
+            border: 1.5px solid #dee2e6;
+            font-size: 0.95rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-floating-icon .form-control:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+        }
+
+        .form-floating-icon .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #adb5bd;
+            font-size: 1.1rem;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .form-floating-icon .form-control:focus ~ .input-icon {
+            color: var(--green);
+        }
+
+        .form-floating-icon .toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #adb5bd;
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+
+        .form-floating-icon .toggle-password:hover {
+            color: var(--navy);
+        }
+
+        .form-label-custom {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 6px;
+        }
+
+        .btn-signin {
+            height: 52px;
+            border-radius: 8px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            background: var(--green);
+            border: none;
+            color: #fff;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-signin:hover {
+            background: var(--green-hover);
+            box-shadow: 0 4px 16px rgba(40, 167, 69, 0.3);
+            color: #fff;
+        }
+
+        .btn-signin:active {
+            transform: scale(0.98);
+        }
+
+        .login-footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #adb5bd;
+        }
+
+        /* Flash messages */
+        .login-alert {
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 991.98px) {
+            .login-brand {
+                display: none;
+            }
+
+            .login-form-panel {
+                width: 100%;
+                padding: 40px 28px;
+            }
+
+            body {
+                background: #ffffff;
+            }
+        }
+
+        @media (min-width: 992px) and (max-width: 1199.98px) {
+            .login-form-panel {
+                width: 420px;
+                padding: 50px 40px;
+            }
+        }
+
+        /* ===== Mobile: show a mini brand header ===== */
+        .mobile-brand {
+            display: none;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .mobile-brand .brand-icon-sm {
+            width: 60px;
+            height: 60px;
+            background: var(--green);
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: #fff;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 16px rgba(40, 167, 69, 0.3);
+        }
+
+        .mobile-brand h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--navy);
+            margin: 0;
+        }
+
+        @media (max-width: 991.98px) {
+            .mobile-brand {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== Left Brand Panel ===== -->
+    <div class="login-brand">
+        <div class="brand-icon">
+            <i class="bi bi-shop"></i>
+        </div>
+        <div class="brand-title">SuperMart POS</div>
+        <div class="brand-subtitle">
+            Complete point-of-sale solution for modern supermarkets and retail stores.
+        </div>
+        <ul class="brand-features">
+            <li><i class="bi bi-check-circle-fill"></i> Fast barcode scanning &amp; billing</li>
+            <li><i class="bi bi-check-circle-fill"></i> Real-time inventory tracking</li>
+            <li><i class="bi bi-check-circle-fill"></i> GST-compliant invoicing</li>
+            <li><i class="bi bi-check-circle-fill"></i> Detailed sales reports &amp; analytics</li>
+            <li><i class="bi bi-check-circle-fill"></i> Multi-user role-based access</li>
+        </ul>
+    </div>
+
+    <!-- ===== Right Form Panel ===== -->
+    <div class="login-form-panel">
+        <!-- Mobile brand (shown on small screens) -->
+        <div class="mobile-brand">
+            <div class="brand-icon-sm">
+                <i class="bi bi-shop"></i>
+            </div>
+            <h2>SuperMart POS</h2>
+        </div>
+
+        <h1 class="login-heading">Welcome back</h1>
+        <p class="login-subheading">Sign in to your account to continue</p>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="login-alert alert alert-{{ 'danger' if category == 'error' else category }}" role="alert">
+                        <i class="bi {% if category == 'error' or category == 'danger' %}bi-exclamation-triangle-fill{% else %}bi-info-circle-fill{% endif %} me-2"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-3">
+                <label for="username" class="form-label-custom">Username</label>
+                <div class="form-floating-icon">
+                    <input type="text"
+                           class="form-control"
+                           id="username"
+                           name="username"
+                           placeholder="Enter your username"
+                           autocomplete="username"
+                           required
+                           autofocus>
+                    <i class="bi bi-person input-icon"></i>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label for="password" class="form-label-custom">Password</label>
+                <div class="form-floating-icon">
+                    <input type="password"
+                           class="form-control"
+                           id="password"
+                           name="password"
+                           placeholder="Enter your password"
+                           autocomplete="current-password"
+                           required>
+                    <i class="bi bi-lock input-icon"></i>
+                    <button type="button" class="toggle-password" id="togglePassword" tabindex="-1" aria-label="Toggle password visibility">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-signin w-100">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+            </button>
+        </form>
+
+        <div class="login-footer">
+            SuperMart POS &copy; 2026 &mdash; All rights reserved.
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="{{ url_for('static', filename='libs/bootstrap.bundle.min.js') }}"
+            onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js';document.head.appendChild(s);"></script>
+
+    <script>
+        // ===== Toggle Password Visibility =====
+        (function () {
+            const toggleBtn = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+
+            toggleBtn.addEventListener('click', function () {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+                this.querySelector('i').classList.toggle('bi-eye');
+                this.querySelector('i').classList.toggle('bi-eye-slash');
+            });
+        })();
+
+        // ===== Auto-focus username if empty, else password =====
+        (function () {
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            if (usernameInput.value.trim() !== '') {
+                passwordInput.focus();
+            }
+        })();
+    </script>
+</body>
+</html>

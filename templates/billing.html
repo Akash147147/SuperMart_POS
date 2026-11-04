@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+
+{% block title %}Billing Counter - SuperMart POS{% endblock %}
+
+{% block content %}
+<div class="billing-container">
+    <!-- Left Section: Scanners, Search, and Cart Table -->
+    <div class="billing-main">
+        <div class="barcode-input-group">
+            <i class="bi bi-upc-scan fs-4 text-navy"></i>
+            <input type="text" id="barcode-input" placeholder="Scan barcode (Enter) or type code..." autofocus autocomplete="off">
+            <button class="btn btn-outline-primary" id="btn-search-modal" type="button" title="Product Search (F4)">
+                <i class="bi bi-search"></i> Search [F4]
+            </button>
+            <button class="btn btn-outline-secondary" id="btn-camera-modal" type="button" title="Camera Scanner">
+                <i class="bi bi-camera"></i> Camera
+            </button>
+        </div>
+
+        <div class="billing-table-wrap">
+            <div class="table-responsive">
+                <table class="table table-pos align-middle" id="billing-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">#</th>
+                            <th>Product Name</th>
+                            <th>HSN</th>
+                            <th style="width: 140px;">Quantity</th>
+                            <th>MRP</th>
+                            <th>Price</th>
+                            <th>GST%</th>
+                            <th style="width: 100px;">Disc (₹)</th>
+                            <th>Amount</th>
+                            <th style="width: 40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart-tbody">
+                        <tr id="empty-cart-row">
+                            <td colspan="10" class="text-center py-5 text-muted">
+                                <i class="bi bi-cart fs-1 d-block mb-2"></i>
+                                Scan barcode or search products to begin billing
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Section: Bill Summary & Actions -->
+    <div class="billing-sidebar">
+        <div class="billing-summary">
+            <div class="summary-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-receipt"></i> Bill Summary</span>
+                <span class="badge bg-secondary" id="item-count-badge">0 items</span>
+            </div>
+            
+            <div class="summary-body">
+                <div class="mb-3">
+                    <label class="form-label fs-sm text-muted mb-1">Customer (Optional)</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="cust-phone-input" class="form-control" placeholder="Mobile number">
+                        <button class="btn btn-outline-secondary" type="button" id="btn-cust-lookup"><i class="bi bi-check"></i></button>
+                    </div>
+                    <div id="cust-info" class="fs-sm fw-600 text-success mt-1" style="display:none;"></div>
+                </div>
+
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span id="sum-subtotal">₹0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Discount:</span>
+                    <span id="sum-discount" class="text-danger">-₹0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Taxable Amount:</span>
+                    <span id="sum-taxable">₹0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>CGST:</span>
+                    <span id="sum-cgst">₹0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>SGST:</span>
+                    <span id="sum-sgst">₹0.00</span>
+                </div>
+                <div class="summary-row" id="row-cess" style="display:none;">
+                    <span>Cess:</span>
+                    <span id="sum-cess">₹0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Round Off:</span>
+                    <span id="sum-roundoff">₹0.00</span>
+                </div>
+                <div class="summary-row total">
+                    <span>Net Payable:</span>
+                    <span id="sum-final" class="text-success">₹0.00</span>
+                </div>
+            </div>
+
+            <div class="summary-actions">
+                <button class="btn btn-pay" id="btn-checkout">
+                    <i class="bi bi-check2-circle"></i> Pay & Bill [F8]
+                </button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-hold flex-fill" id="btn-hold-bill" type="button">
+                        <i class="bi bi-pause-circle"></i> Hold [Ctrl+H]
+                    </button>
+                    <button class="btn btn-secondary flex-fill" id="btn-resume-bill" type="button">
+                        <i class="bi bi-play-circle"></i> Resume
+                    </button>
+                </div>
+                <button class="btn btn-clear btn-sm" id="btn-clear-cart" type="button">
+                    <i class="bi bi-trash"></i> Clear Bill
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-navy text-white">
+                <h5 class="modal-title"><i class="bi bi-credit-card"></i> Complete Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center py-2 bg-light rounded mb-3">
+                    <span class="fs-sm text-muted">Amount Due</span>
+                    <h2 class="fw-bold text-success m-0" id="modal-due-amount">₹0.00</h2>
+                </div>
+
+                <ul class="nav nav-pills nav-fill mb-3" id="payTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-cash">Cash</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-upi">UPI / QR</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-card">Card</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Cash tab -->
+                    <div class="tab-pane fade show active" id="tab-cash">
+                        <label class="form-label">Cash Received (₹)</label>
+                        <input type="number" step="0.01" class="form-control form-control-lg" id="cash-received" placeholder="0.00">
+                        <div class="quick-cash-btns mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-cash" data-amt="exact">Exact</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-cash" data-amt="50">₹50</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-cash" data-amt="100">₹100</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-cash" data-amt="200">₹200</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-cash" data-amt="500">₹500</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-cash" data-amt="1000">₹1000</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-cash" data-amt="2000">₹2000</button>
+                        </div>
+                        <div class="mt-3 p-2 bg-light rounded d-flex justify-content-between">
+                            <span class="fw-bold">Change to Return:</span>
+                            <span class="fw-bold text-primary fs-5" id="cash-change">₹0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- UPI tab -->
+                    <div class="tab-pane fade" id="tab-upi">
+                        <div class="mb-3">
+                            <label class="form-label">UPI Reference / Transaction ID</label>
+                            <input type="text" class="form-control" id="upi-ref" placeholder="12-digit transaction ID">
+                        </div>
+                    </div>
+
+                    <!-- Card tab -->
+                    <div class="tab-pane fade" id="tab-card">
+                        <div class="mb-3">
+                            <label class="form-label">Card Machine Reference / Auth Code</label>
+                            <input type="text" class="form-control" id="card-ref" placeholder="Approval or invoice code">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="btn-confirm-payment">
+                    <i class="bi bi-printer"></i> Finalize & Print
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Product Search Modal -->
+<div class="modal fade" id="searchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-search"></i> Product Search</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control mb-3" id="modal-search-box" placeholder="Type product name or brand...">
+                <div class="table-responsive" style="max-height: 350px;">
+                    <table class="table table-hover table-sm">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Barcode</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="search-results-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let cart = [];
+let currentFinalAmount = 0;
+let currentCustomerId = null;
+
+const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+
+const barcodeInput = document.getElementById('barcode-input');
+const cartTbody = document.getElementById('cart-tbody');
+
+barcodeInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const code = this.value.trim();
+        if (code) {
+            lookupBarcode(code);
+            this.value = '';
+        }
+    }
+});
+
+function lookupBarcode(barcode) {
+    fetch('/api/billing/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ barcode: barcode })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success && res.data) {
+            addItemToCart(res.data);
+        } else {
+            alert(res.message || 'Product not found');
+        }
+    })
+    .catch(err => alert('Error scanning barcode: ' + err));
+}
+
+function addItemToCart(product) {
+    const existing = cart.find(item => item.product_id === product.id);
+    if (existing) {
+        existing.quantity += 1;
+    } else {
+        cart.push({
+            product_id: product.id,
+            product_name: product.name,
+            barcode: product.barcode,
+            hsn_code: product.hsn_code,
+            selling_price: parseFloat(product.selling_price),
+            mrp: parseFloat(product.mrp),
+            gst_percentage: parseFloat(product.gst_percentage),
+            quantity: 1,
+            discount_amount: 0,
+            discount_percentage: 0
+        });
+    }
+    renderCart();
+}
+
+function renderCart() {
+    if (cart.length === 0) {
+        cartTbody.innerHTML = `
+            <tr id="empty-cart-row">
+                <td colspan="10" class="text-center py-5 text-muted">
+                    <i class="bi bi-cart fs-1 d-block mb-2"></i>
+                    Scan barcode or search products to begin billing
+                </td>
+            </tr>`;
+        updateSummaryZeros();
+        return;
+    }
+
+    cartTbody.innerHTML = '';
+    cart.forEach((item, index) => {
+        const itemTotal = (item.selling_price * item.quantity) - item.discount_amount;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td class="fw-600">${item.product_name}</td>
+            <td>${item.hsn_code || '-'}</td>
+            <td>
+                <div class="qty-control">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="changeQty(${index}, -1)">-</button>
+                    <input type="number" min="1" step="any" value="${item.quantity}" onchange="setQty(${index}, this.value)">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="changeQty(${index}, 1)">+</button>
+                </div>
+            </td>
+            <td>₹${item.mrp.toFixed(2)}</td>
+            <td>₹${item.selling_price.toFixed(2)}</td>
+            <td>${item.gst_percentage}%</td>
+            <td>
+                <input type="number" step="0.01" class="form-control form-control-sm" style="width: 80px;" value="${item.discount_amount}" onchange="setDiscount(${index}, this.value)">
+            </td>
+            <td class="fw-bold">₹${itemTotal.toFixed(2)}</td>
+            <td>
+                <button class="btn btn-link text-danger p-0" onclick="removeItem(${index})"><i class="bi bi-x-circle"></i></button>
+            </td>
+        `;
+        cartTbody.appendChild(tr);
+    });
+
+    calculateServerTotals();
+}
+
+function changeQty(idx, delta) {
+    cart[idx].quantity = Math.max(1, cart[idx].quantity + delta);
+    renderCart();
+}
+
+function setQty(idx, val) {
+    cart[idx].quantity = Math.max(1, parseFloat(val) || 1);
+    renderCart();
+}
+
+function setDiscount(idx, val) {
+    cart[idx].discount_amount = Math.max(0, parseFloat(val) || 0);
+    renderCart();
+}
+
+function removeItem(idx) {
+    cart.splice(idx, 1);
+    renderCart();
+}
+
+function updateSummaryZeros() {
+    document.getElementById('sum-subtotal').innerText = '₹0.00';
+    document.getElementById('sum-discount').innerText = '-₹0.00';
+    document.getElementById('sum-taxable').innerText = '₹0.00';
+    document.getElementById('sum-cgst').innerText = '₹0.00';
+    document.getElementById('sum-sgst').innerText = '₹0.00';
+    document.getElementById('sum-roundoff').innerText = '₹0.00';
+    document.getElementById('sum-final').innerText = '₹0.00';
+    document.getElementById('item-count-badge').innerText = '0 items';
+    currentFinalAmount = 0;
+}
+
+function calculateServerTotals() {
+    fetch('/api/billing/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ items: cart })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success && res.data) {
+            const d = res.data;
+            document.getElementById('sum-subtotal').innerText = '₹' + d.subtotal;
+            document.getElementById('sum-discount').innerText = '-₹' + d.total_discount;
+            document.getElementById('sum-taxable').innerText = '₹' + d.taxable_amount;
+            document.getElementById('sum-cgst').innerText = '₹' + d.cgst_total;
+            document.getElementById('sum-sgst').innerText = '₹' + d.sgst_total;
+            document.getElementById('sum-roundoff').innerText = '₹' + d.round_off;
+            document.getElementById('sum-final').innerText = '₹' + d.final_amount;
+            document.getElementById('item-count-badge').innerText = `${d.total_items} items`;
+            currentFinalAmount = parseFloat(d.final_amount);
+        }
+    });
+}
+
+// Payment Modal Handling
+const payModal = new bootstrap.Modal(document.getElementById('paymentModal'));
+document.getElementById('btn-checkout').addEventListener('click', () => {
+    if (cart.length === 0) {
+        alert('Cart is empty');
+        return;
+    }
+    document.getElementById('modal-due-amount').innerText = '₹' + currentFinalAmount.toFixed(2);
+    document.getElementById('cash-received').value = currentFinalAmount.toFixed(2);
+    document.getElementById('cash-change').innerText = '₹0.00';
+    payModal.show();
+});
+
+document.getElementById('cash-received').addEventListener('input', function() {
+    const rec = parseFloat(this.value) || 0;
+    const diff = rec - currentFinalAmount;
+    document.getElementById('cash-change').innerText = '₹' + Math.max(0, diff).toFixed(2);
+});
+
+document.querySelectorAll('.btn-quick-cash').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const v = this.getAttribute('data-amt');
+        if (v === 'exact') {
+            document.getElementById('cash-received').value = currentFinalAmount.toFixed(2);
+        } else {
+            document.getElementById('cash-received').value = parseFloat(v).toFixed(2);
+        }
+        document.getElementById('cash-received').dispatchEvent(new Event('input'));
+    });
+});
+
+document.getElementById('btn-confirm-payment').addEventListener('click', () => {
+    const activeTab = document.querySelector('#payTabs .active').innerText.toLowerCase();
+    let method = 'cash';
+    let ref = '';
+    let rec = currentFinalAmount;
+
+    if (activeTab.includes('upi')) {
+        method = 'upi';
+        ref = document.getElementById('upi-ref').value;
+    } else if (activeTab.includes('card')) {
+        method = 'card';
+        ref = document.getElementById('card-ref').value;
+    } else {
+        rec = parseFloat(document.getElementById('cash-received').value) || currentFinalAmount;
+        if (rec < currentFinalAmount) {
+            alert('Cash received is less than total amount');
+            return;
+        }
+    }
+
+    const payload = {
+        cart_items: cart,
+        payment_data: [{
+            method: method,
+            amount: currentFinalAmount,
+            amount_received: rec,
+            change_returned: Math.max(0, rec - currentFinalAmount),
+            reference: ref
+        }],
+        customer_id: currentCustomerId
+    };
+
+    fetch('/api/billing/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success && res.data) {
+            payModal.hide();
+            const invId = res.data.id;
+            // Open print window
+            window.open(`/api/sales/invoice/${invId}/receipt`, '_blank', 'width=400,height=600');
+            cart = [];
+            renderCart();
+            barcodeInput.focus();
+        } else {
+            alert(res.message || 'Failed to complete transaction');
+        }
+    })
+    .catch(err => alert('Transaction error: ' + err));
+});
+
+// Clear cart
+document.getElementById('btn-clear-cart').addEventListener('click', () => {
+    if (confirm('Clear the entire current cart?')) {
+        cart = [];
+        renderCart();
+        barcodeInput.focus();
+    }
+});
+
+// Search Modal
+const searchModal = new bootstrap.Modal(document.getElementById('searchModal'));
+document.getElementById('btn-search-modal').addEventListener('click', () => {
+    searchModal.show();
+    document.getElementById('modal-search-box').focus();
+});
+
+document.getElementById('modal-search-box').addEventListener('input', function() {
+    const q = this.value.trim();
+    if (q.length < 2) return;
+    fetch('/api/billing/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ query: q })
+    })
+    .then(r => r.json())
+    .then(res => {
+        const tbody = document.getElementById('search-results-tbody');
+        tbody.innerHTML = '';
+        if (res.success && res.data) {
+            res.data.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${p.name}</td>
+                    <td>${p.barcode || '-'}</td>
+                    <td>₹${p.selling_price}</td>
+                    <td>${p.stock_quantity}</td>
+                    <td><button class="btn btn-sm btn-success">Add</button></td>
+                `;
+                tr.querySelector('button').addEventListener('click', () => {
+                    addItemToCart(p);
+                    searchModal.hide();
+                    barcodeInput.focus();
+                });
+                tbody.appendChild(tr);
+            });
+        }
+    });
+});
+
+// Shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'F2') {
+        e.preventDefault();
+        barcodeInput.focus();
+    } else if (e.key === 'F4') {
+        e.preventDefault();
+        document.getElementById('btn-search-modal').click();
+    } else if (e.key === 'F8') {
+        e.preventDefault();
+        document.getElementById('btn-checkout').click();
+    }
+});
+</script>
+{% endblock %}
+

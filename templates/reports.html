@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Reports & Analytics - SuperMart POS{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-3">
+    <h4><i class="bi bi-graph-up"></i> Sales & Tax Reports</h4>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-label">Total Revenue</div>
+            <div class="stat-value text-success" id="rep-total-sales">₹0.00</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-label">Total Invoices</div>
+            <div class="stat-value text-primary" id="rep-total-bills">0</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-label">Total GST Collected</div>
+            <div class="stat-value text-info" id="rep-total-tax">₹0.00</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-label">Average Bill Value</div>
+            <div class="stat-value text-secondary" id="rep-avg-bill">₹0.00</div>
+        </div>
+    </div>
+</div>
+
+<div class="card-section p-3">
+    <h5>GST Tax Breakdown</h5>
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm">
+            <thead class="table-light">
+                <tr>
+                    <th>GST Rate</th>
+                    <th>Taxable Amount</th>
+                    <th>CGST</th>
+                    <th>SGST</th>
+                    <th>IGST</th>
+                    <th>Total Tax</th>
+                </tr>
+            </thead>
+            <tbody id="gst-rep-tbody">
+                <tr><td colspan="6" class="text-center">Loading tax report...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadReports() {
+    fetch('/api/reports/sales-summary')
+    .then(r => r.json())
+    .then(res => {
+        if (res.success && res.data) {
+            const d = res.data;
+            document.getElementById('rep-total-sales').innerText = '₹' + d.total_sales;
+            document.getElementById('rep-total-bills').innerText = d.total_bills;
+            document.getElementById('rep-total-tax').innerText = '₹' + d.total_tax;
+            document.getElementById('rep-avg-bill').innerText = '₹' + d.average_bill_value;
+        }
+    });
+
+    fetch('/api/reports/gst-report')
+    .then(r => r.json())
+    .then(res => {
+        const tbody = document.getElementById('gst-rep-tbody');
+        tbody.innerHTML = '';
+        if (res.success && res.data && res.data.length > 0) {
+            res.data.forEach(g => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="fw-bold">${g.gst_percentage}%</td>
+                    <td>₹${g.taxable_amount}</td>
+                    <td>₹${g.cgst_amount}</td>
+                    <td>₹${g.sgst_amount}</td>
+                    <td>₹${g.igst_amount}</td>
+                    <td class="fw-bold text-success">₹${g.total_tax}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No GST data recorded yet</td></tr>';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', loadReports);
+</script>
+{% endblock %}
+

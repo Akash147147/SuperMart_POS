@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Hardware Settings - SuperMart POS{% endblock %}
+
+{% block content %}
+<div class="page-header mb-3">
+    <h4><i class="bi bi-gear-wide-connected"></i> Hardware Configuration & Testing</h4>
+</div>
+
+<div class="row g-3">
+    <!-- Scanner Test Card -->
+    <div class="col-md-6">
+        <div class="card-section p-3">
+            <h5 class="mb-3"><i class="bi bi-upc"></i> Barcode Scanner Test</h5>
+            <p class="text-muted fs-sm">Test USB, Wireless, or Bluetooth keyboard-emulation barcode scanners.</p>
+            <div class="mb-3">
+                <input type="text" id="scanner-test-input" class="form-control form-control-lg" placeholder="Scan any barcode here...">
+            </div>
+            <div id="scanner-test-log" class="p-2 border rounded bg-light" style="min-height: 100px; font-family: monospace;">
+                Ready for input...
+            </div>
+        </div>
+    </div>
+
+    <!-- Thermal Printer Test Card -->
+    <div class="col-md-6">
+        <div class="card-section p-3">
+            <h5 class="mb-3"><i class="bi bi-printer"></i> Thermal Receipt Printer</h5>
+            <p class="text-muted fs-sm">Verify printer width, paper formatting, and connectivity.</p>
+            <div class="mb-3">
+                <label class="form-label">Paper Width</label>
+                <select class="form-select" id="printer-width-select">
+                    <option value="80mm">80mm Thermal Paper</option>
+                    <option value="58mm">58mm Thermal Paper</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="testPrintReceipt()">
+                <i class="bi bi-file-earmark-text"></i> Print Test Receipt
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const testInput = document.getElementById('scanner-test-input');
+const testLog = document.getElementById('scanner-test-log');
+
+testInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        const val = this.value.trim();
+        if (val) {
+            testLog.innerHTML = `<span class="text-success">[SUCCESS]</span> Scanned: <strong>${val}</strong> (${val.length} chars) at ${new Date().toLocaleTimeString()}<br>` + testLog.innerHTML;
+            this.value = '';
+        }
+    }
+});
+
+function testPrintReceipt() {
+    const width = document.getElementById('printer-width-select').value;
+    const printWin = window.open('', '_blank', 'width=350,height=500');
+    printWin.document.write(`
+        <html><head><title>Test Receipt</title>
+        <style>
+            @page { size: ${width} auto; margin: 3mm; }
+            body { font-family: 'Courier New', monospace; font-size: 11px; text-align: center; }
+        </style></head>
+        <body onload="window.print()">
+            <h3>SUPERMART POS</h3>
+            <p>===============================</p>
+            <p>HARDWARE TEST RECEIPT</p>
+            <p>Printer: ${width} Thermal</p>
+            <p>Date: ${new Date().toLocaleString()}</p>
+            <p>Status: OK / CONNECTED</p>
+            <p>===============================</p>
+            <p>THANK YOU</p>
+        </body></html>
+    `);
+    printWin.document.close();
+}
+</script>
+{% endblock %}
+

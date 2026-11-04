@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Supermarket Settings - SuperMart POS{% endblock %}
+
+{% block content %}
+<div class="page-header mb-3">
+    <h4><i class="bi bi-sliders"></i> Supermarket & Store Settings</h4>
+</div>
+
+<div class="card-section p-4" style="max-width: 800px;">
+    <form id="store-settings-form">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Supermarket Name</label>
+                <input type="text" class="form-control" id="set-store-name" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">GSTIN / Tax ID</label>
+                <input type="text" class="form-control" id="set-gstin">
+            </div>
+            <div class="col-12">
+                <label class="form-label">Store Address</label>
+                <textarea class="form-control" id="set-address" rows="2"></textarea>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Phone</label>
+                <input type="text" class="form-control" id="set-phone">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" id="set-email">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Default Paper Width</label>
+                <select class="form-select" id="set-paper-width">
+                    <option value="80mm">80mm Thermal</option>
+                    <option value="58mm">58mm Thermal</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label">Receipt Footer Note</label>
+                <input type="text" class="form-control" id="set-footer">
+            </div>
+            <div class="col-12 mt-4">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Settings</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+
+function loadSettings() {
+    fetch('/api/settings/store')
+    .then(r => r.json())
+    .then(res => {
+        if (res.success && res.data) {
+            const s = res.data;
+            document.getElementById('set-store-name').value = s.name || '';
+            document.getElementById('set-gstin').value = s.gstin || '';
+            document.getElementById('set-address').value = s.address || '';
+            document.getElementById('set-phone').value = s.phone || '';
+            document.getElementById('set-email').value = s.email || '';
+            document.getElementById('set-paper-width').value = s.receipt_paper_width || '80mm';
+            document.getElementById('set-footer').value = s.receipt_footer || '';
+        }
+    });
+}
+
+document.getElementById('store-settings-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const payload = {
+        name: document.getElementById('set-store-name').value,
+        gstin: document.getElementById('set-gstin').value,
+        address: document.getElementById('set-address').value,
+        phone: document.getElementById('set-phone').value,
+        email: document.getElementById('set-email').value,
+        receipt_paper_width: document.getElementById('set-paper-width').value,
+        receipt_footer: document.getElementById('set-footer').value
+    };
+
+    fetch('/api/settings/store', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            alert('Settings updated successfully');
+        } else {
+            alert(res.message || 'Failed to update settings');
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', loadSettings);
+</script>
+{% endblock %}
+

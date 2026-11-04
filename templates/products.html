@@ -1,0 +1,1144 @@
+{% extends "base.html" %}
+
+{% block title %}Product Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-table th {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        font-weight: 600;
+        white-space: nowrap;
+        border-top: none;
+    }
+    .product-table td {
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
+    .product-table tbody tr:nth-child(even) {
+        background-color: #f8f9fa;
+    }
+    .product-table tbody tr:hover {
+        background-color: #e9ecef;
+    }
+
+    .stock-badge-red {
+        background-color: #f8d7da;
+        color: #842029;
+    }
+    .stock-badge-yellow {
+        background-color: #fff3cd;
+        color: #664d03;
+    }
+    .stock-badge-green {
+        background-color: #d1e7dd;
+        color: #0f5132;
+    }
+
+    .status-active {
+        background-color: #d1e7dd;
+        color: #0f5132;
+    }
+    .status-inactive {
+        background-color: #f8d7da;
+        color: #842029;
+    }
+
+    .search-box {
+        max-width: 300px;
+    }
+
+    .filter-bar {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+    }
+
+    .page-header-actions .btn {
+        border-radius: 8px;
+    }
+
+    .product-barcode {
+        font-family: 'Courier New', Courier, monospace;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #495057;
+    }
+
+    .pagination .page-link {
+        border-radius: 6px;
+        margin: 0 2px;
+        border: 1px solid #dee2e6;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .modal-header {
+        border-bottom: 2px solid #f0f0f0;
+    }
+    .modal-footer {
+        border-top: 2px solid #f0f0f0;
+    }
+
+    .form-label {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #495057;
+    }
+
+    .import-results {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .btn-action {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+        border-radius: 6px;
+    }
+
+    .empty-state {
+        padding: 3rem 1rem;
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: #dee2e6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+        <div>
+            <h3 class="mb-1"><i class="bi bi-box-seam me-2"></i>Product Management</h3>
+            <p class="text-muted mb-0">Manage your store inventory and product catalog.</p>
+        </div>
+        <div class="page-header-actions d-flex flex-wrap gap-2 mt-2 mt-md-0">
+            {% if current_user.role == 'admin' %}
+            <button type="button" class="btn btn-primary" id="btnAddProduct">
+                <i class="bi bi-plus-lg me-1"></i>Add Product
+            </button>
+            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importCsvModal">
+                <i class="bi bi-upload me-1"></i>Import CSV
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-outline-secondary" id="btnExport">
+                <i class="bi bi-download me-1"></i>Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar mb-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-lg-4 col-md-6">
+                <div class="input-group search-box w-100" style="max-width:100%;">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0" id="searchInput" 
+                           placeholder="Search by name, barcode, brand..." autocomplete="off">
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-3">
+                <select class="form-select" id="filterCategory">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-3">
+                <select class="form-select" id="filterStatus">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+            <div class="col-lg-3 col-md-12 text-end">
+                <span class="text-muted" id="productCount">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Products Table -->
+    <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+        <div class="card-body p-0">
+            <!-- Loading spinner -->
+            <div class="text-center py-5" id="tableSpinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading products...</span>
+                </div>
+                <p class="text-muted mt-2">Loading products...</p>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive" id="tableContainer" style="display:none;">
+                <table class="table product-table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Barcode</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Brand</th>
+                            <th class="text-end">MRP (₹)</th>
+                            <th class="text-end">Selling Price (₹)</th>
+                            <th class="text-center">GST%</th>
+                            <th class="text-center">Stock</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div class="empty-state text-center" id="emptyState" style="display:none;">
+                <i class="bi bi-inbox d-block mb-2"></i>
+                <h5 class="text-muted">No Products Found</h5>
+                <p class="text-muted">Try adjusting your search or filter criteria.</p>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="card-footer bg-white border-top d-flex flex-wrap align-items-center justify-content-between py-3"
+             id="paginationContainer" style="display:none; border-radius: 0 0 12px 12px;">
+            <div class="text-muted small" id="paginationInfo">
+                Showing 0 to 0 of 0 products
+            </div>
+            <nav aria-label="Product pagination">
+                <ul class="pagination pagination-sm mb-0" id="paginationControls">
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Product Modal -->
+<div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="productModalLabel">
+                    <i class="bi bi-plus-circle me-2"></i>Add Product
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="productForm" novalidate>
+                    <input type="hidden" id="productId" value="">
+
+                    <!-- Basic Info -->
+                    <h6 class="text-primary mb-3"><i class="bi bi-info-circle me-1"></i>Basic Information</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-8">
+                            <label for="productName" class="form-label">Product Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="productName" required maxlength="200"
+                                   placeholder="Enter product name">
+                            <div class="invalid-feedback">Product name is required.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productBarcode" class="form-label">Barcode</label>
+                            <input type="text" class="form-control" id="productBarcode" maxlength="50"
+                                   placeholder="Scan or enter barcode">
+                            <div class="invalid-feedback" id="barcodeFeedback">Invalid barcode.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productHsn" class="form-label">HSN Code</label>
+                            <input type="text" class="form-control" id="productHsn" maxlength="20"
+                                   placeholder="HSN/SAC code">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productCategory" class="form-label">Category</label>
+                            <div class="input-group">
+                                <select class="form-select" id="productCategory">
+                                    <option value="">Select Category</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-secondary" id="btnNewCategory" title="Add new category">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productBrand" class="form-label">Brand</label>
+                            <input type="text" class="form-control" id="productBrand" maxlength="100"
+                                   placeholder="Brand name">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productSizeWeight" class="form-label">Size / Weight</label>
+                            <input type="text" class="form-control" id="productSizeWeight" maxlength="50"
+                                   placeholder="e.g., 500g, 1L">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productUnit" class="form-label">Unit</label>
+                            <select class="form-select" id="productUnit">
+                                <option value="pcs">Pieces (pcs)</option>
+                                <option value="kg">Kilograms (kg)</option>
+                                <option value="g">Grams (g)</option>
+                                <option value="l">Liters (L)</option>
+                                <option value="ml">Milliliters (mL)</option>
+                                <option value="m">Meters (m)</option>
+                                <option value="box">Box</option>
+                                <option value="pack">Pack</option>
+                                <option value="dozen">Dozen</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Pricing -->
+                    <h6 class="text-primary mb-3"><i class="bi bi-currency-rupee me-1"></i>Pricing</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label for="productMrp" class="form-label">MRP (₹) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="productMrp" required min="0" step="0.01"
+                                   placeholder="0.00">
+                            <div class="invalid-feedback">MRP is required and must be valid.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productSellingPrice" class="form-label">Selling Price (₹) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="productSellingPrice" required min="0" step="0.01"
+                                   placeholder="0.00">
+                            <div class="invalid-feedback">Selling price is required and must be valid.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productPurchasePrice" class="form-label">Purchase Price (₹)</label>
+                            <input type="number" class="form-control" id="productPurchasePrice" min="0" step="0.01"
+                                   placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <!-- Tax -->
+                    <h6 class="text-primary mb-3"><i class="bi bi-receipt me-1"></i>Tax Information</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label for="productGst" class="form-label">GST Percentage</label>
+                            <select class="form-select" id="productGst">
+                                <option value="0">0% (Exempt / Nil)</option>
+                                <option value="5">5%</option>
+                                <option value="12">12%</option>
+                                <option value="18" selected>18%</option>
+                                <option value="28">28%</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productCess" class="form-label">Cess Percentage</label>
+                            <input type="number" class="form-control" id="productCess" min="0" step="0.01" value="0"
+                                   placeholder="0.00">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="productGstExempt">
+                                <label class="form-check-label" for="productGstExempt">GST Exempt</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stock -->
+                    <h6 class="text-primary mb-3"><i class="bi bi-box me-1"></i>Stock & Inventory</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label for="productStock" class="form-label">Stock Quantity</label>
+                            <input type="number" class="form-control" id="productStock" min="0" step="1" value="0"
+                                   placeholder="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="productMinStock" class="form-label">Min Stock Level</label>
+                            <input type="number" class="form-control" id="productMinStock" min="0" step="1" value="10"
+                                   placeholder="10">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="productSoldByWeight">
+                                <label class="form-check-label" for="productSoldByWeight">Sold by Weight</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Duplicate barcode warning -->
+                    <div class="alert alert-warning d-none" id="duplicateBarcodeAlert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <span id="duplicateBarcodeMsg">A product with this barcode already exists.</span>
+                    </div>
+
+                    <!-- Server error -->
+                    <div class="alert alert-danger d-none" id="productFormError">
+                        <i class="bi bi-x-circle me-2"></i>
+                        <span id="productFormErrorMsg"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="btnSaveProduct">
+                    <span class="spinner-border spinner-border-sm d-none me-1" id="saveSpinner" role="status"></span>
+                    <i class="bi bi-check-lg me-1" id="saveIcon"></i>
+                    <span id="saveBtnText">Save Product</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Category Modal -->
+<div class="modal fade" id="newCategoryModal" tabindex="-1" aria-labelledby="newCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="newCategoryModalLabel">
+                    <i class="bi bi-folder-plus me-2"></i>New Category
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="newCategoryName" class="form-label">Category Name</label>
+                <input type="text" class="form-control" id="newCategoryName" maxlength="100"
+                       placeholder="Enter category name">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSaveCategory">
+                    <i class="bi bi-check-lg me-1"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import CSV Modal -->
+<div class="modal fade" id="importCsvModal" tabindex="-1" aria-labelledby="importCsvModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importCsvModalLabel">
+                    <i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Products from CSV
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="csvFile" class="form-label">Select CSV File</label>
+                    <input type="file" class="form-control" id="csvFile" accept=".csv">
+                    <div class="form-text">
+                        Upload a CSV file with product data. 
+                        <a href="/api/products/sample-csv" class="text-primary" id="downloadSampleCsv">
+                            <i class="bi bi-download me-1"></i>Download sample CSV
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Import progress -->
+                <div class="d-none" id="importProgress">
+                    <div class="progress mb-2" style="height: 6px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" 
+                             style="width: 100%" id="importProgressBar"></div>
+                    </div>
+                    <p class="text-muted small text-center" id="importStatusText">Importing products...</p>
+                </div>
+
+                <!-- Import results -->
+                <div class="d-none" id="importResults">
+                    <h6 class="mb-2">Import Results</h6>
+                    <div class="import-results border rounded p-3 bg-light">
+                        <div id="importResultsContent"></div>
+                    </div>
+                </div>
+
+                <!-- Import error -->
+                <div class="alert alert-danger d-none" id="importError">
+                    <i class="bi bi-x-circle me-2"></i>
+                    <span id="importErrorMsg"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="btnImportCsv">
+                    <span class="spinner-border spinner-border-sm d-none me-1" id="importSpinner" role="status"></span>
+                    <i class="bi bi-upload me-1" id="importIcon"></i>
+                    <span id="importBtnText">Import</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // CSRF token from meta tag
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    // State
+    let currentPage = 1;
+    let perPage = 20;
+    let searchQuery = '';
+    let categoryFilter = '';
+    let statusFilter = '';
+    let searchTimeout = null;
+    let categories = [];
+
+    // DOM Elements
+    const searchInput = document.getElementById('searchInput');
+    const filterCategory = document.getElementById('filterCategory');
+    const filterStatus = document.getElementById('filterStatus');
+    const productsBody = document.getElementById('productsBody');
+    const tableContainer = document.getElementById('tableContainer');
+    const tableSpinner = document.getElementById('tableSpinner');
+    const emptyState = document.getElementById('emptyState');
+    const paginationContainer = document.getElementById('paginationContainer');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const paginationControls = document.getElementById('paginationControls');
+    const productCount = document.getElementById('productCount');
+
+    // Modal elements
+    const productModal = new bootstrap.Modal(document.getElementById('productModal'));
+    const productForm = document.getElementById('productForm');
+
+    // ==========================================
+    // Load Categories
+    // ==========================================
+    function loadCategories() {
+        fetch('/api/categories')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    categories = data.categories || [];
+                    populateCategoryDropdowns();
+                }
+            })
+            .catch(err => console.error('Failed to load categories:', err));
+    }
+
+    function populateCategoryDropdowns() {
+        // Filter dropdown
+        const currentFilterVal = filterCategory.value;
+        filterCategory.innerHTML = '<option value="">All Categories</option>';
+        categories.forEach(cat => {
+            filterCategory.innerHTML += `<option value="${escapeHtml(cat.id || cat.name)}">${escapeHtml(cat.name)}</option>`;
+        });
+        filterCategory.value = currentFilterVal;
+
+        // Product form dropdown
+        const productCategorySelect = document.getElementById('productCategory');
+        const currentFormVal = productCategorySelect.value;
+        productCategorySelect.innerHTML = '<option value="">Select Category</option>';
+        categories.forEach(cat => {
+            productCategorySelect.innerHTML += `<option value="${escapeHtml(cat.id || cat.name)}">${escapeHtml(cat.name)}</option>`;
+        });
+        productCategorySelect.value = currentFormVal;
+    }
+
+    // ==========================================
+    // Load Products
+    // ==========================================
+    function loadProducts() {
+        tableSpinner.style.display = 'block';
+        tableContainer.style.display = 'none';
+        emptyState.style.display = 'none';
+        paginationContainer.style.display = 'none';
+
+        const params = new URLSearchParams({
+            page: currentPage,
+            per_page: perPage
+        });
+        if (searchQuery) params.append('search', searchQuery);
+        if (categoryFilter) params.append('category', categoryFilter);
+        if (statusFilter) params.append('status', statusFilter);
+
+        fetch('/api/products?' + params.toString())
+            .then(r => r.json())
+            .then(data => {
+                tableSpinner.style.display = 'none';
+
+                if (data.success) {
+                    const products = data.products || [];
+                    const total = data.total || 0;
+                    const totalPages = data.total_pages || 1;
+
+                    productCount.textContent = total + ' product' + (total !== 1 ? 's' : '') + ' found';
+
+                    if (products.length === 0) {
+                        emptyState.style.display = 'block';
+                        return;
+                    }
+
+                    renderProducts(products);
+                    renderPagination(total, totalPages);
+                    tableContainer.style.display = 'block';
+                    paginationContainer.style.display = 'flex';
+                } else {
+                    emptyState.style.display = 'block';
+                    productCount.textContent = 'Error loading products';
+                }
+            })
+            .catch(err => {
+                console.error('Failed to load products:', err);
+                tableSpinner.style.display = 'none';
+                emptyState.style.display = 'block';
+                productCount.textContent = 'Connection error';
+            });
+    }
+
+    // ==========================================
+    // Render Products Table
+    // ==========================================
+    function renderProducts(products) {
+        productsBody.innerHTML = '';
+        const startIndex = (currentPage - 1) * perPage;
+
+        products.forEach(function(product, index) {
+            const row = document.createElement('tr');
+
+            // Stock badge
+            let stockBadgeClass = 'stock-badge-green';
+            const stock = parseInt(product.stock_quantity) || 0;
+            const minStock = parseInt(product.min_stock_level) || 10;
+            if (stock <= 0) {
+                stockBadgeClass = 'stock-badge-red';
+            } else if (stock <= minStock) {
+                stockBadgeClass = 'stock-badge-yellow';
+            }
+
+            // Status badge
+            const isActive = product.is_active !== false;
+            const statusBadgeClass = isActive ? 'status-active' : 'status-inactive';
+            const statusText = isActive ? 'Active' : 'Inactive';
+
+            // Actions
+            let actionsHtml = `
+                <button class="btn btn-outline-primary btn-action me-1" onclick="editProduct(${product.id})" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            `;
+            {% if current_user.role == 'admin' %}
+            if (isActive) {
+                actionsHtml += `
+                    <button class="btn btn-outline-danger btn-action" onclick="toggleProductStatus(${product.id}, false)" title="Deactivate">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                `;
+            } else {
+                actionsHtml += `
+                    <button class="btn btn-outline-success btn-action" onclick="toggleProductStatus(${product.id}, true)" title="Activate">
+                        <i class="bi bi-check-circle"></i>
+                    </button>
+                `;
+            }
+            {% endif %}
+
+            row.innerHTML = `
+                <td>${startIndex + index + 1}</td>
+                <td><span class="product-barcode">${escapeHtml(product.barcode || '—')}</span></td>
+                <td>
+                    <div class="fw-semibold">${escapeHtml(product.name)}</div>
+                    ${product.size_weight ? '<small class="text-muted">' + escapeHtml(product.size_weight) + '</small>' : ''}
+                </td>
+                <td>${escapeHtml(product.category_name || '—')}</td>
+                <td>${escapeHtml(product.brand || '—')}</td>
+                <td class="text-end">₹${formatDecimal(product.mrp)}</td>
+                <td class="text-end fw-semibold">₹${formatDecimal(product.selling_price)}</td>
+                <td class="text-center">${product.gst_percentage || 0}%</td>
+                <td class="text-center">
+                    <span class="badge ${stockBadgeClass} rounded-pill px-3">${stock}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge ${statusBadgeClass} rounded-pill px-3">${statusText}</span>
+                </td>
+                <td class="text-center text-nowrap">${actionsHtml}</td>
+            `;
+
+            productsBody.appendChild(row);
+        });
+    }
+
+    // ==========================================
+    // Render Pagination
+    // ==========================================
+    function renderPagination(total, totalPages) {
+        const start = (currentPage - 1) * perPage + 1;
+        const end = Math.min(currentPage * perPage, total);
+        paginationInfo.textContent = `Showing ${start} to ${end} of ${total} products`;
+
+        paginationControls.innerHTML = '';
+
+        // Previous button
+        const prevLi = document.createElement('li');
+        prevLi.className = 'page-item' + (currentPage <= 1 ? ' disabled' : '');
+        prevLi.innerHTML = '<a class="page-link" href="#" aria-label="Previous"><i class="bi bi-chevron-left"></i></a>';
+        prevLi.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (currentPage > 1) {
+                currentPage--;
+                loadProducts();
+            }
+        });
+        paginationControls.appendChild(prevLi);
+
+        // Page numbers
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, currentPage + 2);
+
+        if (startPage > 1) {
+            paginationControls.appendChild(createPageItem(1));
+            if (startPage > 2) {
+                const ellipsis = document.createElement('li');
+                ellipsis.className = 'page-item disabled';
+                ellipsis.innerHTML = '<span class="page-link">…</span>';
+                paginationControls.appendChild(ellipsis);
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            paginationControls.appendChild(createPageItem(i));
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const ellipsis = document.createElement('li');
+                ellipsis.className = 'page-item disabled';
+                ellipsis.innerHTML = '<span class="page-link">…</span>';
+                paginationControls.appendChild(ellipsis);
+            }
+            paginationControls.appendChild(createPageItem(totalPages));
+        }
+
+        // Next button
+        const nextLi = document.createElement('li');
+        nextLi.className = 'page-item' + (currentPage >= totalPages ? ' disabled' : '');
+        nextLi.innerHTML = '<a class="page-link" href="#" aria-label="Next"><i class="bi bi-chevron-right"></i></a>';
+        nextLi.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadProducts();
+            }
+        });
+        paginationControls.appendChild(nextLi);
+    }
+
+    function createPageItem(pageNum) {
+        const li = document.createElement('li');
+        li.className = 'page-item' + (pageNum === currentPage ? ' active' : '');
+        li.innerHTML = `<a class="page-link" href="#">${pageNum}</a>`;
+        li.addEventListener('click', function(e) {
+            e.preventDefault();
+            currentPage = pageNum;
+            loadProducts();
+        });
+        return li;
+    }
+
+    // ==========================================
+    // Search (Debounced 300ms)
+    // ==========================================
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            searchQuery = searchInput.value.trim();
+            currentPage = 1;
+            loadProducts();
+        }, 300);
+    });
+
+    // ==========================================
+    // Filter Change Handlers
+    // ==========================================
+    filterCategory.addEventListener('change', function() {
+        categoryFilter = this.value;
+        currentPage = 1;
+        loadProducts();
+    });
+
+    filterStatus.addEventListener('change', function() {
+        statusFilter = this.value;
+        currentPage = 1;
+        loadProducts();
+    });
+
+    // ==========================================
+    // Add Product Button
+    // ==========================================
+    document.getElementById('btnAddProduct')?.addEventListener('click', function() {
+        resetProductForm();
+        document.getElementById('productModalLabel').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Add Product';
+        document.getElementById('saveBtnText').textContent = 'Save Product';
+        productModal.show();
+    });
+
+    // ==========================================
+    // Reset Product Form
+    // ==========================================
+    function resetProductForm() {
+        productForm.reset();
+        productForm.classList.remove('was-validated');
+        document.getElementById('productId').value = '';
+        document.getElementById('productGst').value = '18';
+        document.getElementById('productCess').value = '0';
+        document.getElementById('productStock').value = '0';
+        document.getElementById('productMinStock').value = '10';
+        document.getElementById('productUnit').value = 'pcs';
+        document.getElementById('duplicateBarcodeAlert').classList.add('d-none');
+        document.getElementById('productFormError').classList.add('d-none');
+        document.getElementById('productBarcode').classList.remove('is-invalid');
+    }
+
+    // ==========================================
+    // Edit Product
+    // ==========================================
+    window.editProduct = function(productId) {
+        resetProductForm();
+        document.getElementById('productModalLabel').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Product';
+        document.getElementById('saveBtnText').textContent = 'Update Product';
+
+        fetch('/api/products/' + productId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const p = data.product;
+                    document.getElementById('productId').value = p.id;
+                    document.getElementById('productName').value = p.name || '';
+                    document.getElementById('productBarcode').value = p.barcode || '';
+                    document.getElementById('productHsn').value = p.hsn_code || '';
+                    document.getElementById('productCategory').value = p.category_id || '';
+                    document.getElementById('productBrand').value = p.brand || '';
+                    document.getElementById('productSizeWeight').value = p.size_weight || '';
+                    document.getElementById('productUnit').value = p.unit || 'pcs';
+                    document.getElementById('productMrp').value = p.mrp || '';
+                    document.getElementById('productSellingPrice').value = p.selling_price || '';
+                    document.getElementById('productPurchasePrice').value = p.purchase_price || '';
+                    document.getElementById('productGst').value = p.gst_percentage || '18';
+                    document.getElementById('productCess').value = p.cess_percentage || '0';
+                    document.getElementById('productStock').value = p.stock_quantity || '0';
+                    document.getElementById('productMinStock').value = p.min_stock_level || '10';
+                    document.getElementById('productSoldByWeight').checked = p.sold_by_weight || false;
+                    document.getElementById('productGstExempt').checked = p.is_gst_exempt || false;
+
+                    productModal.show();
+                } else {
+                    alert('Failed to load product details.');
+                }
+            })
+            .catch(err => {
+                console.error('Error loading product:', err);
+                alert('Unable to load product details.');
+            });
+    };
+
+    // ==========================================
+    // Save Product
+    // ==========================================
+    document.getElementById('btnSaveProduct').addEventListener('click', function() {
+        // Client-side validation
+        const name = document.getElementById('productName').value.trim();
+        const mrp = document.getElementById('productMrp').value;
+        const sellingPrice = document.getElementById('productSellingPrice').value;
+
+        productForm.classList.add('was-validated');
+
+        if (!name || !mrp || !sellingPrice) {
+            return;
+        }
+
+        if (parseFloat(mrp) < 0 || parseFloat(sellingPrice) < 0) {
+            return;
+        }
+
+        const productId = document.getElementById('productId').value;
+        const isEdit = !!productId;
+
+        const payload = {
+            name: name,
+            barcode: document.getElementById('productBarcode').value.trim() || null,
+            hsn_code: document.getElementById('productHsn').value.trim() || null,
+            category_id: document.getElementById('productCategory').value || null,
+            brand: document.getElementById('productBrand').value.trim() || null,
+            size_weight: document.getElementById('productSizeWeight').value.trim() || null,
+            unit: document.getElementById('productUnit').value,
+            mrp: parseFloat(mrp),
+            selling_price: parseFloat(sellingPrice),
+            purchase_price: parseFloat(document.getElementById('productPurchasePrice').value) || null,
+            gst_percentage: parseFloat(document.getElementById('productGst').value),
+            cess_percentage: parseFloat(document.getElementById('productCess').value) || 0,
+            stock_quantity: parseInt(document.getElementById('productStock').value) || 0,
+            min_stock_level: parseInt(document.getElementById('productMinStock').value) || 10,
+            sold_by_weight: document.getElementById('productSoldByWeight').checked,
+            is_gst_exempt: document.getElementById('productGstExempt').checked
+        };
+
+        // Show loading state
+        const saveBtn = document.getElementById('btnSaveProduct');
+        const saveSpinner = document.getElementById('saveSpinner');
+        const saveIcon = document.getElementById('saveIcon');
+        saveBtn.disabled = true;
+        saveSpinner.classList.remove('d-none');
+        saveIcon.classList.add('d-none');
+
+        const url = isEdit ? '/api/products/' + productId : '/api/products';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            saveBtn.disabled = false;
+            saveSpinner.classList.add('d-none');
+            saveIcon.classList.remove('d-none');
+
+            if (data.success) {
+                productModal.hide();
+                loadProducts();
+            } else {
+                // Check for duplicate barcode
+                if (data.error === 'duplicate_barcode') {
+                    document.getElementById('duplicateBarcodeAlert').classList.remove('d-none');
+                    document.getElementById('duplicateBarcodeMsg').textContent = data.message || 'A product with this barcode already exists.';
+                    document.getElementById('productBarcode').classList.add('is-invalid');
+                    document.getElementById('barcodeFeedback').textContent = data.message || 'Duplicate barcode.';
+                } else {
+                    document.getElementById('productFormError').classList.remove('d-none');
+                    document.getElementById('productFormErrorMsg').textContent = data.message || 'Failed to save product.';
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Save product error:', err);
+            saveBtn.disabled = false;
+            saveSpinner.classList.add('d-none');
+            saveIcon.classList.remove('d-none');
+            document.getElementById('productFormError').classList.remove('d-none');
+            document.getElementById('productFormErrorMsg').textContent = 'Unable to connect to server.';
+        });
+    });
+
+    // ==========================================
+    // Check Duplicate Barcode on Blur
+    // ==========================================
+    document.getElementById('productBarcode').addEventListener('blur', function() {
+        const barcode = this.value.trim();
+        const productId = document.getElementById('productId').value;
+
+        if (!barcode) {
+            document.getElementById('duplicateBarcodeAlert').classList.add('d-none');
+            this.classList.remove('is-invalid');
+            return;
+        }
+
+        const params = new URLSearchParams({ barcode: barcode });
+        if (productId) params.append('exclude_id', productId);
+
+        fetch('/api/products/check-barcode?' + params.toString())
+            .then(r => r.json())
+            .then(data => {
+                if (data.exists) {
+                    document.getElementById('duplicateBarcodeAlert').classList.remove('d-none');
+                    document.getElementById('duplicateBarcodeMsg').textContent = 'A product with barcode "' + barcode + '" already exists.';
+                    document.getElementById('productBarcode').classList.add('is-invalid');
+                    document.getElementById('barcodeFeedback').textContent = 'Duplicate barcode found.';
+                } else {
+                    document.getElementById('duplicateBarcodeAlert').classList.add('d-none');
+                    document.getElementById('productBarcode').classList.remove('is-invalid');
+                }
+            })
+            .catch(() => {});
+    });
+
+    // ==========================================
+    // Toggle Product Status (Activate/Deactivate)
+    // ==========================================
+    window.toggleProductStatus = function(productId, activate) {
+        const action = activate ? 'activate' : 'deactivate';
+        if (!confirm('Are you sure you want to ' + action + ' this product?')) return;
+
+        fetch('/api/products/' + productId + '/status', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ is_active: activate })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                loadProducts();
+            } else {
+                alert(data.message || 'Failed to update product status.');
+            }
+        })
+        .catch(err => {
+            console.error('Toggle status error:', err);
+            alert('Unable to connect to server.');
+        });
+    };
+
+    // ==========================================
+    // New Category
+    // ==========================================
+    document.getElementById('btnNewCategory')?.addEventListener('click', function() {
+        document.getElementById('newCategoryName').value = '';
+        const modal = new bootstrap.Modal(document.getElementById('newCategoryModal'));
+        modal.show();
+    });
+
+    document.getElementById('btnSaveCategory')?.addEventListener('click', function() {
+        const name = document.getElementById('newCategoryName').value.trim();
+        if (!name) {
+            document.getElementById('newCategoryName').classList.add('is-invalid');
+            return;
+        }
+
+        fetch('/api/categories', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ name: name })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('newCategoryModal')).hide();
+                loadCategories();
+                // Select the newly created category
+                setTimeout(() => {
+                    if (data.category_id) {
+                        document.getElementById('productCategory').value = data.category_id;
+                    }
+                }, 300);
+            } else {
+                alert(data.message || 'Failed to create category.');
+            }
+        })
+        .catch(err => {
+            console.error('Create category error:', err);
+            alert('Unable to connect to server.');
+        });
+    });
+
+    // ==========================================
+    // Export Products
+    // ==========================================
+    document.getElementById('btnExport')?.addEventListener('click', function() {
+        const params = new URLSearchParams();
+        if (searchQuery) params.append('search', searchQuery);
+        if (categoryFilter) params.append('category', categoryFilter);
+        if (statusFilter) params.append('status', statusFilter);
+
+        window.location.href = '/api/products/export?' + params.toString();
+    });
+
+    // ==========================================
+    // Import CSV
+    // ==========================================
+    document.getElementById('btnImportCsv')?.addEventListener('click', function() {
+        const fileInput = document.getElementById('csvFile');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            document.getElementById('importError').classList.remove('d-none');
+            document.getElementById('importErrorMsg').textContent = 'Please select a CSV file.';
+            return;
+        }
+
+        // Reset states
+        document.getElementById('importError').classList.add('d-none');
+        document.getElementById('importResults').classList.add('d-none');
+
+        // Show progress
+        const importProgress = document.getElementById('importProgress');
+        importProgress.classList.remove('d-none');
+
+        const importBtn = document.getElementById('btnImportCsv');
+        const importSpinner = document.getElementById('importSpinner');
+        const importIcon = document.getElementById('importIcon');
+        importBtn.disabled = true;
+        importSpinner.classList.remove('d-none');
+        importIcon.classList.add('d-none');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch('/api/products/import', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            importBtn.disabled = false;
+            importSpinner.classList.add('d-none');
+            importIcon.classList.remove('d-none');
+            importProgress.classList.add('d-none');
+
+            if (data.success) {
+                document.getElementById('importResults').classList.remove('d-none');
+                let html = '<div class="mb-2">';
+                html += '<span class="badge bg-success me-2">' + (data.imported || 0) + ' imported</span>';
+                html += '<span class="badge bg-warning me-2">' + (data.skipped || 0) + ' skipped</span>';
+                html += '<span class="badge bg-danger">' + (data.errors || 0) + ' errors</span>';
+                html += '</div>';
+
+                if (data.error_details && data.error_details.length > 0) {
+                    html += '<ul class="list-unstyled small mb-0">';
+                    data.error_details.forEach(function(err) {
+                        html += '<li class="text-danger"><i class="bi bi-x-circle me-1"></i>' + escapeHtml(err) + '</li>';
+                    });
+                    html += '</ul>';
+                }
+
+                document.getElementById('importResultsContent').innerHTML = html;
+                loadProducts();
+            } else {
+                document.getElementById('importError').classList.remove('d-none');
+                document.getElementById('importErrorMsg').textContent = data.message || 'Import failed.';
+            }
+        })
+        .catch(err => {
+            console.error('Import error:', err);
+            importBtn.disabled = false;
+            importSpinner.classList.add('d-none');
+            importIcon.classList.remove('d-none');
+            importProgress.classList.add('d-none');
+            document.getElementById('importError').classList.remove('d-none');
+            document.getElementById('importErrorMsg').textContent = 'Unable to connect to server.';
+        });
+    });
+
+    // ==========================================
+    // Utility Functions
+    // ==========================================
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
+
+    function formatDecimal(value) {
+        if (value === null || value === undefined) return '0.00';
+        return parseFloat(value).toFixed(2);
+    }
+
+    // ==========================================
+    // Initialize
+    // ==========================================
+    loadCategories();
+    loadProducts();
+});
+</script>
+{% endblock %}

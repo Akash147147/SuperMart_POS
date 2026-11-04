@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tax Invoice - {{ invoice.invoice_number }}</title>
+    <style>
+        @page {
+            size: {{ paper_width }} auto;
+            margin: 5mm;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+        .receipt {
+            width: 100%;
+            max-width: {{ paper_width }};
+            margin: auto;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .fw-bold { font-weight: bold; }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 2px 0;
+            font-size: 11px;
+        }
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="no-print" style="text-align: center; margin-bottom: 15px;">
+        <button onclick="window.print()" style="padding: 6px 12px; cursor: pointer;">Print Receipt</button>
+    </div>
+
+    <div class="receipt">
+        <div class="text-center">
+            <div class="fw-bold" style="font-size: 14px;">{{ store.name }}</div>
+            {% if store.address %}<div>{{ store.address }}</div>{% endif %}
+            {% if store.phone %}<div>Tel: {{ store.phone }}</div>{% endif %}
+            {% if store.gstin %}<div>GSTIN: {{ store.gstin }}</div>{% endif %}
+            <div class="fw-bold" style="margin-top: 4px;">TAX INVOICE</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+            <div><strong>Bill No:</strong> {{ invoice.invoice_number }}</div>
+            <div><strong>Date:</strong> {{ invoice.invoice_date.strftime('%d-%b-%Y %I:%M %p') }}</div>
+            <div><strong>Cashier:</strong> {{ invoice.cashier.full_name }}</div>
+            {% if invoice.customer %}
+            <div><strong>Customer:</strong> {{ invoice.customer.name }} ({{ invoice.customer.phone }})</div>
+            {% endif %}
+        </div>
+
+        <div class="divider"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th align="left">Item</th>
+                    <th class="text-right">Qty</th>
+                    <th class="text-right">Price</th>
+                    <th class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in invoice.items %}
+                <tr>
+                    <td>{{ item.product_name }}</td>
+                    <td class="text-right">{{ item.quantity }}</td>
+                    <td class="text-right">{{ item.selling_price }}</td>
+                    <td class="text-right">{{ item.total_amount }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="divider"></div>
+
+        <table>
+            <tr>
+                <td>Subtotal:</td>
+                <td class="text-right">₹{{ invoice.subtotal }}</td>
+            </tr>
+            {% if invoice.discount_amount > 0 %}
+            <tr>
+                <td>Discount:</td>
+                <td class="text-right">-₹{{ invoice.discount_amount }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td>Taxable Value:</td>
+                <td class="text-right">₹{{ invoice.taxable_amount }}</td>
+            </tr>
+            {% if invoice.tax_type == 'intra-state' %}
+            <tr>
+                <td>CGST:</td>
+                <td class="text-right">₹{{ invoice.cgst_total }}</td>
+            </tr>
+            <tr>
+                <td>SGST:</td>
+                <td class="text-right">₹{{ invoice.sgst_total }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td>IGST:</td>
+                <td class="text-right">₹{{ invoice.igst_total }}</td>
+            </tr>
+            {% endif %}
+            {% if invoice.round_off != 0 %}
+            <tr>
+                <td>Round Off:</td>
+                <td class="text-right">₹{{ invoice.round_off }}</td>
+            </tr>
+            {% endif %}
+            <tr class="fw-bold" style="font-size: 13px;">
+                <td>NET AMOUNT:</td>
+                <td class="text-right">₹{{ invoice.final_amount }}</td>
+            </tr>
+        </table>
+
+        <div class="divider"></div>
+
+        <div style="font-size: 10px;">
+            <div><strong>In Words:</strong> {{ amount_words }}</div>
+            {% for pay in invoice.payments %}
+            <div><strong>Payment Mode:</strong> {{ pay.payment_method|upper }} (₹{{ pay.amount }})</div>
+            {% if pay.payment_method == 'cash' and pay.amount_received > pay.amount %}
+            <div><strong>Received:</strong> ₹{{ pay.amount_received }} | <strong>Change:</strong> ₹{{ pay.change_returned }}</div>
+            {% endif %}
+            {% endfor %}
+            <div><strong>Total Items:</strong> {{ invoice.total_items }} (Qty: {{ invoice.total_quantity }})</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="text-center" style="margin-top: 6px;">
+            <div>{{ store.receipt_footer }}</div>
+            <div style="font-size: 9px; margin-top: 4px;">Powered by SuperMart POS</div>
+        </div>
+    </div>
+</body>
+</html>
+

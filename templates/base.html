@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}SuperMart POS{% endblock %}</title>
+
+    <!-- Bootstrap 5 CSS (local with CDN fallback) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/bootstrap.min.css') }}"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css';">
+
+    <!-- Bootstrap Icons (local with CDN fallback) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/bootstrap-icons.min.css') }}"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {% block styles %}{% endblock %}
+
+    <style>
+        /* ===== Root Variables ===== */
+        :root {
+            --sidebar-width: 250px;
+            --sidebar-collapsed-width: 0px;
+            --navbar-height: 60px;
+            --sidebar-bg: #1a2744;
+            --sidebar-hover: #243456;
+            --sidebar-active: #28a745;
+            --navbar-bg: #ffffff;
+            --content-bg: #f0f2f5;
+            --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            --transition-speed: 0.3s;
+        }
+
+        /* ===== Global ===== */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--content-bg);
+            overflow-x: hidden;
+        }
+
+        /* ===== Sidebar ===== */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--sidebar-bg);
+            color: #ffffff;
+            z-index: 1040;
+            transition: transform var(--transition-speed) ease;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(calc(-1 * var(--sidebar-width)));
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 20px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #ffffff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            white-space: nowrap;
+        }
+
+        .sidebar-brand i {
+            font-size: 1.5rem;
+            color: var(--sidebar-active);
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 12px 0;
+        }
+
+        .sidebar-nav .nav-label {
+            padding: 10px 20px 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .sidebar-nav .nav-item {
+            margin: 2px 10px;
+        }
+
+        .sidebar-nav .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            color: rgba(255, 255, 255, 0.75);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .sidebar-nav .nav-link:hover {
+            color: #ffffff;
+            background: var(--sidebar-hover);
+        }
+
+        .sidebar-nav .nav-link.active {
+            color: #ffffff;
+            background: var(--sidebar-active);
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.35);
+        }
+
+        .sidebar-nav .nav-link i {
+            font-size: 1.15rem;
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer {
+            padding: 14px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-align: center;
+        }
+
+        /* ===== Navbar ===== */
+        .top-navbar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: var(--sidebar-width);
+            height: var(--navbar-height);
+            background: var(--navbar-bg);
+            border-bottom: 1px solid #e0e4e8;
+            z-index: 1030;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            transition: left var(--transition-speed) ease;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+        }
+
+        .top-navbar.expanded {
+            left: 0;
+        }
+
+        .sidebar-toggle {
+            background: none;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 1.1rem;
+            color: var(--sidebar-bg);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--content-bg);
+            color: var(--sidebar-active);
+        }
+
+        .navbar-datetime {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .navbar-datetime i {
+            color: var(--sidebar-active);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-info .user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--sidebar-bg);
+        }
+
+        .role-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .role-badge.admin {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .role-badge.cashier {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .btn-logout {
+            font-size: 0.85rem;
+            padding: 6px 14px;
+            border-radius: 6px;
+        }
+
+        /* ===== Main Content ===== */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--navbar-height);
+            padding: 24px;
+            min-height: calc(100vh - var(--navbar-height));
+            transition: margin-left var(--transition-speed) ease;
+        }
+
+        .main-content.expanded {
+            margin-left: 0;
+        }
+
+        /* ===== Cards ===== */
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: var(--card-shadow);
+        }
+
+        /* ===== Overlay for mobile ===== */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1035;
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+        }
+
+        /* ===== Flash Messages ===== */
+        .flash-container {
+            position: fixed;
+            top: calc(var(--navbar-height) + 12px);
+            right: 20px;
+            z-index: 1060;
+            max-width: 420px;
+            width: 100%;
+        }
+
+        .flash-container .alert {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            animation: slideInRight 0.35s ease;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 991.98px) {
+            .sidebar {
+                transform: translateX(calc(-1 * var(--sidebar-width)));
+            }
+
+            .sidebar.show-mobile {
+                transform: translateX(0);
+            }
+
+            .top-navbar {
+                left: 0;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== Sidebar Overlay (mobile) ===== -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ===== Sidebar ===== -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-shop"></i>
+            <span>SuperMart POS</span>
+        </div>
+
+        <div class="sidebar-nav">
+            <div class="nav-label">Main</div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('dashboard') %}active{% endif %}"
+                       href="{{ url_for('dashboard.dashboard') }}">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('billing') %}active{% endif %}"
+                       href="{{ url_for('billing.billing_counter') }}">
+                        <i class="bi bi-cart3"></i>
+                        <span>Billing Counter</span>
+                    </a>
+                </li>
+            </ul>
+
+            <div class="nav-label">Inventory</div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('products') %}active{% endif %}"
+                       href="{{ url_for('products.list_products') }}">
+                        <i class="bi bi-box-seam"></i>
+                        <span>Products</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('inventory') %}active{% endif %}"
+                       href="{{ url_for('inventory.inventory_list') }}">
+                        <i class="bi bi-boxes"></i>
+                        <span>Inventory</span>
+                    </a>
+                </li>
+            </ul>
+
+            <div class="nav-label">Transactions</div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('sales') %}active{% endif %}"
+                       href="{{ url_for('sales.sales_history') }}">
+                        <i class="bi bi-receipt"></i>
+                        <span>Sales History</span>
+                    </a>
+                </li>
+                {% if current_user.is_admin %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('reports') %}active{% endif %}"
+                       href="{{ url_for('reports.reports_dashboard') }}">
+                        <i class="bi bi-graph-up"></i>
+                        <span>Reports</span>
+                    </a>
+                </li>
+                {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('customers') %}active{% endif %}"
+                       href="{{ url_for('customers.list_customers') }}">
+                        <i class="bi bi-people"></i>
+                        <span>Customers</span>
+                    </a>
+                </li>
+            </ul>
+
+            <div class="nav-label">System</div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('hardware') %}active{% endif %}"
+                       href="{{ url_for('hardware.hardware_settings') }}">
+                        <i class="bi bi-gear-wide-connected"></i>
+                        <span>Hardware</span>
+                    </a>
+                </li>
+                {% if current_user.is_admin %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('settings') %}active{% endif %}"
+                       href="{{ url_for('settings.app_settings') }}">
+                        <i class="bi bi-sliders"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <div class="sidebar-footer">
+            SuperMart POS &copy; 2026
+        </div>
+    </nav>
+
+    <!-- ===== Top Navbar ===== -->
+    <header class="top-navbar" id="topNavbar">
+        <button class="sidebar-toggle me-3" id="sidebarToggle" title="Toggle sidebar">
+            <i class="bi bi-list"></i>
+        </button>
+
+        <span class="fw-bold me-auto d-none d-sm-inline" style="color: #1a2744; font-size: 1.05rem;">
+            SuperMart POS
+        </span>
+
+        <div class="navbar-datetime me-3 d-none d-md-flex align-items-center gap-2">
+            <i class="bi bi-calendar3"></i>
+            <span id="currentDateTime"></span>
+        </div>
+
+        <div class="user-info me-3">
+            <span class="user-name d-none d-sm-inline">{{ current_user.full_name or current_user.username }}</span>
+            <span class="role-badge {{ 'admin' if current_user.is_admin else 'cashier' }}">
+                {{ 'Admin' if current_user.is_admin else 'Cashier' }}
+            </span>
+        </div>
+
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger btn-logout">
+            <i class="bi bi-box-arrow-right"></i>
+            <span class="d-none d-sm-inline ms-1">Logout</span>
+        </a>
+    </header>
+
+    <!-- ===== Flash Messages ===== -->
+    <div class="flash-container" id="flashContainer">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show mb-2" role="alert">
+                        <i class="bi {% if category == 'success' %}bi-check-circle-fill{% elif category == 'error' or category == 'danger' %}bi-exclamation-triangle-fill{% elif category == 'warning' %}bi-exclamation-circle-fill{% else %}bi-info-circle-fill{% endif %} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- ===== Main Content ===== -->
+    <main class="main-content" id="mainContent">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- jQuery (local) -->
+    <script src="{{ url_for('static', filename='libs/jquery.min.js') }}"></script>
+
+    <!-- Bootstrap 5 JS Bundle (local with CDN fallback) -->
+    <script src="{{ url_for('static', filename='libs/bootstrap.bundle.min.js') }}"
+            onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js';document.head.appendChild(s);"></script>
+
+    <script>
+        // ===== Sidebar Toggle =====
+        (function () {
+            const sidebar = document.getElementById('sidebar');
+            const topNavbar = document.getElementById('topNavbar');
+            const mainContent = document.getElementById('mainContent');
+            const toggleBtn = document.getElementById('sidebarToggle');
+            const overlay = document.getElementById('sidebarOverlay');
+            const MOBILE_BREAKPOINT = 992;
+
+            function isMobile() {
+                return window.innerWidth < MOBILE_BREAKPOINT;
+            }
+
+            // Restore desktop preference
+            const savedState = localStorage.getItem('sidebarCollapsed');
+            if (savedState === 'true' && !isMobile()) {
+                sidebar.classList.add('collapsed');
+                topNavbar.classList.add('expanded');
+                mainContent.classList.add('expanded');
+            }
+
+            toggleBtn.addEventListener('click', function () {
+                if (isMobile()) {
+                    sidebar.classList.toggle('show-mobile');
+                    overlay.classList.toggle('show');
+                } else {
+                    sidebar.classList.toggle('collapsed');
+                    topNavbar.classList.toggle('expanded');
+                    mainContent.classList.toggle('expanded');
+                    localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+                }
+            });
+
+            overlay.addEventListener('click', function () {
+                sidebar.classList.remove('show-mobile');
+                overlay.classList.remove('show');
+            });
+
+            // Handle resize
+            window.addEventListener('resize', function () {
+                if (!isMobile()) {
+                    sidebar.classList.remove('show-mobile');
+                    overlay.classList.remove('show');
+                }
+            });
+        })();
+
+        // ===== Date/Time =====
+        (function () {
+            const dtEl = document.getElementById('currentDateTime');
+            function updateDateTime() {
+                const now = new Date();
+                const options = {
+                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+                };
+                dtEl.textContent = now.toLocaleString('en-IN', options);
+            }
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+        })();
+
+        // ===== Auto-dismiss flash messages =====
+        (function () {
+            setTimeout(function () {
+                document.querySelectorAll('#flashContainer .alert').forEach(function (alert) {
+                    var bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+                    bsAlert.close();
+                });
+            }, 5000);
+        })();
+
+        // ===== CSRF setup for AJAX =====
+        (function () {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]');
+            if (csrfToken && typeof $ !== 'undefined') {
+                $.ajaxSetup({
+                    beforeSend: function (xhr, settings) {
+                        if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                            xhr.setRequestHeader('X-CSRFToken', csrfToken.getAttribute('content'));
+                        }
+                    }
+                });
+            }
+        })();
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

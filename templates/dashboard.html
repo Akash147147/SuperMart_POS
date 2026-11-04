@@ -1,0 +1,665 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border: none;
+        border-radius: 12px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        overflow: hidden;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    .stat-card .card-body {
+        padding: 1.5rem;
+    }
+    .stat-card .stat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    .stat-card .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .stat-card .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        font-weight: 500;
+    }
+    .stat-card.sales .stat-icon {
+        background-color: rgba(25, 135, 84, 0.12);
+        color: #198754;
+    }
+    .stat-card.sales .stat-value { color: #198754; }
+
+    .stat-card.bills .stat-icon {
+        background-color: rgba(13, 110, 253, 0.12);
+        color: #0d6efd;
+    }
+    .stat-card.bills .stat-value { color: #0d6efd; }
+
+    .stat-card.products .stat-icon {
+        background-color: rgba(253, 126, 20, 0.12);
+        color: #fd7e14;
+    }
+    .stat-card.products .stat-value { color: #fd7e14; }
+
+    .stat-card.lowstock .stat-icon {
+        background-color: rgba(220, 53, 69, 0.12);
+        color: #dc3545;
+    }
+    .stat-card.lowstock .stat-value { color: #dc3545; }
+
+    .chart-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .chart-card .card-header {
+        background: transparent;
+        border-bottom: 1px solid #eee;
+        font-weight: 600;
+        padding: 1rem 1.25rem;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        padding: 1rem;
+    }
+
+    .data-table-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .data-table-card .card-header {
+        background: transparent;
+        border-bottom: 1px solid #eee;
+        font-weight: 600;
+        padding: 1rem 1.25rem;
+    }
+    .data-table-card .table {
+        margin-bottom: 0;
+    }
+    .data-table-card .table th {
+        border-top: none;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        font-weight: 600;
+    }
+    .data-table-card .table td {
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
+
+    .spinner-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 80px;
+    }
+
+    .badge-paid {
+        background-color: #d1e7dd;
+        color: #0f5132;
+    }
+    .badge-pending {
+        background-color: #fff3cd;
+        color: #664d03;
+    }
+    .badge-cancelled {
+        background-color: #f8d7da;
+        color: #842029;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h3 class="mb-1"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h3>
+            <p class="text-muted mb-0">Welcome back! Here's your store overview for today.</p>
+        </div>
+        <div>
+            <span class="text-muted" id="dashboardDate">
+                <i class="bi bi-calendar3 me-1"></i>
+                <script>document.write(new Date().toLocaleDateString('en-IN', {weekday:'long', year:'numeric', month:'long', day:'numeric'}));</script>
+            </span>
+        </div>
+    </div>
+
+    <!-- Stat Cards Row -->
+    <div class="row g-3 mb-4">
+        <!-- Today's Sales -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card sales shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="stat-label mb-1">Today's Sales</div>
+                            <div class="stat-value" id="statTodaySales">
+                                <div class="spinner-border spinner-border-sm text-success" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="bi bi-currency-rupee"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bills Generated -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card bills shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="stat-label mb-1">Bills Generated</div>
+                            <div class="stat-value" id="statBillsGenerated">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="bi bi-receipt"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Sold -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card products shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="stat-label mb-1">Products Sold</div>
+                            <div class="stat-value" id="statProductsSold">
+                                <div class="spinner-border spinner-border-sm text-warning" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="bi bi-cart-check"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Low Stock Items -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card lowstock shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="stat-label mb-1">Low Stock Items</div>
+                            <div class="stat-value" id="statLowStock">
+                                <div class="spinner-border spinner-border-sm text-danger" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-3 mb-4">
+        <!-- Daily Sales Chart -->
+        <div class="col-xl-6">
+            <div class="card chart-card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Daily Sales (Last 7 Days)</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <div class="spinner-placeholder" id="dailyChartSpinner">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading chart...</span>
+                            </div>
+                        </div>
+                        <canvas id="dailySalesChart" style="display:none;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Sales Chart -->
+        <div class="col-xl-6">
+            <div class="card chart-card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-graph-up me-2 text-success"></i>Monthly Sales (Last 6 Months)</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <div class="spinner-placeholder" id="monthlyChartSpinner">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading chart...</span>
+                            </div>
+                        </div>
+                        <canvas id="monthlySalesChart" style="display:none;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tables Row -->
+    <div class="row g-3 mb-4">
+        <!-- Top Selling Products -->
+        <div class="col-xl-6">
+            <div class="card data-table-card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-trophy-fill me-2 text-warning"></i>Top Selling Products</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="spinner-placeholder" id="topProductsSpinner">
+                        <div class="spinner-border text-warning" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="table-responsive" id="topProductsContainer" style="display:none;">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Product Name</th>
+                                    <th class="text-center">Qty Sold</th>
+                                    <th class="text-end">Revenue (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topProductsBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted py-4" id="topProductsEmpty" style="display:none;">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        No sales data available yet.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="col-xl-6">
+            <div class="card data-table-card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-clock-history me-2 text-info"></i>Recent Transactions</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="spinner-placeholder" id="recentTxSpinner">
+                        <div class="spinner-border text-info" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="table-responsive" id="recentTxContainer" style="display:none;">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Date</th>
+                                    <th class="text-end">Amount (₹)</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentTxBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted py-4" id="recentTxEmpty" style="display:none;">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        No recent transactions.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN with local fallback -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    if (typeof Chart === 'undefined') {
+        document.write('<script src="{{ url_for("static", filename="libs/chart.min.js") }}"><\/script>');
+    }
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let dailySalesChart = null;
+    let monthlySalesChart = null;
+
+    /**
+     * Format number as Indian Rupee currency string
+     */
+    function formatCurrency(value) {
+        if (value === null || value === undefined) return '₹0.00';
+        return '₹' + parseFloat(value).toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    /**
+     * Format number with commas (Indian numbering)
+     */
+    function formatNumber(value) {
+        if (value === null || value === undefined) return '0';
+        return parseInt(value).toLocaleString('en-IN');
+    }
+
+    /**
+     * Get status badge HTML
+     */
+    function getStatusBadge(status) {
+        const statusMap = {
+            'completed': '<span class="badge badge-paid rounded-pill px-3">Completed</span>',
+            'paid': '<span class="badge badge-paid rounded-pill px-3">Paid</span>',
+            'pending': '<span class="badge badge-pending rounded-pill px-3">Pending</span>',
+            'cancelled': '<span class="badge badge-cancelled rounded-pill px-3">Cancelled</span>',
+            'refunded': '<span class="badge badge-cancelled rounded-pill px-3">Refunded</span>'
+        };
+        return statusMap[status?.toLowerCase()] || '<span class="badge bg-secondary rounded-pill px-3">' + (status || 'Unknown') + '</span>';
+    }
+
+    /**
+     * Populate stat cards
+     */
+    function populateStats(data) {
+        document.getElementById('statTodaySales').textContent = formatCurrency(data.today_sales || 0);
+        document.getElementById('statBillsGenerated').textContent = formatNumber(data.bills_generated || 0);
+        document.getElementById('statProductsSold').textContent = formatNumber(data.products_sold || 0);
+        document.getElementById('statLowStock').textContent = formatNumber(data.low_stock_count || 0);
+    }
+
+    /**
+     * Create Daily Sales bar chart
+     */
+    function createDailySalesChart(dailyData) {
+        const spinner = document.getElementById('dailyChartSpinner');
+        const canvas = document.getElementById('dailySalesChart');
+
+        if (!dailyData || dailyData.length === 0) {
+            spinner.innerHTML = '<span class="text-muted">No sales data for the last 7 days.</span>';
+            return;
+        }
+
+        spinner.style.display = 'none';
+        canvas.style.display = 'block';
+
+        const labels = dailyData.map(d => d.date);
+        const values = dailyData.map(d => parseFloat(d.total || 0));
+
+        const ctx = canvas.getContext('2d');
+        dailySalesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Sales (₹)',
+                    data: values,
+                    backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.6,
+                    categoryPercentage: 0.7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return '₹' + parseFloat(context.raw).toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                });
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                if (value >= 1000) return '₹' + (value / 1000).toFixed(1) + 'K';
+                                return '₹' + value;
+                            }
+                        },
+                        grid: { color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Create Monthly Sales line chart
+     */
+    function createMonthlySalesChart(monthlyData) {
+        const spinner = document.getElementById('monthlyChartSpinner');
+        const canvas = document.getElementById('monthlySalesChart');
+
+        if (!monthlyData || monthlyData.length === 0) {
+            spinner.innerHTML = '<span class="text-muted">No monthly sales data available.</span>';
+            return;
+        }
+
+        spinner.style.display = 'none';
+        canvas.style.display = 'block';
+
+        const labels = monthlyData.map(d => d.month);
+        const values = monthlyData.map(d => parseFloat(d.total || 0));
+
+        const ctx = canvas.getContext('2d');
+        monthlySalesChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Sales (₹)',
+                    data: values,
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#198754',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return '₹' + parseFloat(context.raw).toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                });
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                if (value >= 100000) return '₹' + (value / 100000).toFixed(1) + 'L';
+                                if (value >= 1000) return '₹' + (value / 1000).toFixed(1) + 'K';
+                                return '₹' + value;
+                            }
+                        },
+                        grid: { color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Populate Top Selling Products table
+     */
+    function populateTopProducts(products) {
+        const spinner = document.getElementById('topProductsSpinner');
+        const container = document.getElementById('topProductsContainer');
+        const empty = document.getElementById('topProductsEmpty');
+        const tbody = document.getElementById('topProductsBody');
+
+        spinner.style.display = 'none';
+
+        if (!products || products.length === 0) {
+            empty.style.display = 'block';
+            return;
+        }
+
+        container.style.display = 'block';
+        tbody.innerHTML = '';
+
+        products.forEach(function(product, index) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><span class="fw-semibold text-muted">${index + 1}</span></td>
+                <td>
+                    <div class="fw-semibold">${escapeHtml(product.name)}</div>
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-light text-dark border">${formatNumber(product.qty_sold)}</span>
+                </td>
+                <td class="text-end fw-semibold">${formatCurrency(product.revenue)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    /**
+     * Populate Recent Transactions table
+     */
+    function populateRecentTransactions(transactions) {
+        const spinner = document.getElementById('recentTxSpinner');
+        const container = document.getElementById('recentTxContainer');
+        const empty = document.getElementById('recentTxEmpty');
+        const tbody = document.getElementById('recentTxBody');
+
+        spinner.style.display = 'none';
+
+        if (!transactions || transactions.length === 0) {
+            empty.style.display = 'block';
+            return;
+        }
+
+        container.style.display = 'block';
+        tbody.innerHTML = '';
+
+        transactions.forEach(function(tx) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><span class="fw-semibold text-primary">${escapeHtml(tx.invoice_number)}</span></td>
+                <td class="text-muted">${escapeHtml(tx.date)}</td>
+                <td class="text-end fw-semibold">${formatCurrency(tx.amount)}</td>
+                <td class="text-center">${getStatusBadge(tx.status)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
+
+    /**
+     * Show error state on the dashboard
+     */
+    function showError(message) {
+        document.getElementById('statTodaySales').innerHTML = '<span class="text-danger fs-6">Error</span>';
+        document.getElementById('statBillsGenerated').innerHTML = '<span class="text-danger fs-6">Error</span>';
+        document.getElementById('statProductsSold').innerHTML = '<span class="text-danger fs-6">Error</span>';
+        document.getElementById('statLowStock').innerHTML = '<span class="text-danger fs-6">Error</span>';
+
+        ['dailyChartSpinner', 'monthlyChartSpinner', 'topProductsSpinner', 'recentTxSpinner'].forEach(function(id) {
+            document.getElementById(id).innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-circle me-2"></i>' + escapeHtml(message) + '</span>';
+        });
+    }
+
+    // Fetch dashboard data from API
+    fetch('/api/dashboard/stats')
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('Server responded with status ' + response.status);
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.success) {
+                // Populate stat cards
+                populateStats(data);
+
+                // Create charts
+                createDailySalesChart(data.daily_sales || []);
+                createMonthlySalesChart(data.monthly_sales || []);
+
+                // Populate tables
+                populateTopProducts(data.top_products || []);
+                populateRecentTransactions(data.recent_transactions || []);
+            } else {
+                showError(data.message || 'Failed to load dashboard data.');
+            }
+        })
+        .catch(function(error) {
+            console.error('Dashboard fetch error:', error);
+            showError('Unable to connect to server.');
+        });
+});
+</script>
+{% endblock %}
