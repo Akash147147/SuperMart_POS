@@ -318,7 +318,7 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint and request.endpoint.startswith('billing') %}active{% endif %}"
-                       href="{{ url_for('billing.billing_counter') }}">
+                       href="{{ url_for('billing.billing_page') }}">
                         <i class="bi bi-cart3"></i>
                         <span>Billing Counter</span>
                     </a>
@@ -336,7 +336,7 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint and request.endpoint.startswith('inventory') %}active{% endif %}"
-                       href="{{ url_for('inventory.inventory_list') }}">
+                       href="{{ url_for('inventory.inventory_page') }}">
                         <i class="bi bi-boxes"></i>
                         <span>Inventory</span>
                     </a>
@@ -347,7 +347,7 @@
             <ul class="nav flex-column">
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint and request.endpoint.startswith('sales') %}active{% endif %}"
-                       href="{{ url_for('sales.sales_history') }}">
+                       href="{{ url_for('sales.sales_page') }}">
                         <i class="bi bi-receipt"></i>
                         <span>Sales History</span>
                     </a>
@@ -355,7 +355,7 @@
                 {% if current_user.is_admin %}
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint and request.endpoint.startswith('reports') %}active{% endif %}"
-                       href="{{ url_for('reports.reports_dashboard') }}">
+                       href="{{ url_for('reports.reports_page') }}">
                         <i class="bi bi-graph-up"></i>
                         <span>Reports</span>
                     </a>
@@ -374,7 +374,7 @@
             <ul class="nav flex-column">
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint and request.endpoint.startswith('hardware') %}active{% endif %}"
-                       href="{{ url_for('hardware.hardware_settings') }}">
+                       href="{{ url_for('hardware.hardware_page') }}">
                         <i class="bi bi-gear-wide-connected"></i>
                         <span>Hardware</span>
                     </a>
@@ -382,7 +382,7 @@
                 {% if current_user.is_admin %}
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint and request.endpoint.startswith('settings') %}active{% endif %}"
-                       href="{{ url_for('settings.app_settings') }}">
+                       href="{{ url_for('settings.settings_page') }}">
                         <i class="bi bi-sliders"></i>
                         <span>Settings</span>
                     </a>
