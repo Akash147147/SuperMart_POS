@@ -29,8 +29,8 @@
             <button class="btn btn-outline-primary" id="btn-search-modal" type="button" title="Product Search (F4)">
                 <i class="bi bi-search"></i> Search [F4]
             </button>
-            <button class="btn btn-outline-secondary" id="btn-camera-modal" type="button" onclick="openCameraScanner()" data-bs-toggle="modal" data-bs-target="#cameraModal" title="Camera Scanner">
-                <i class="bi bi-camera"></i> Camera
+            <button class="btn btn-outline-primary" id="btn-camera-modal" type="button" data-bs-toggle="modal" data-bs-target="#cameraModal" title="Camera Barcode Scanner (F3)">
+                <i class="bi bi-camera me-1"></i> Camera [F3]
             </button>
         </div>
 
@@ -596,10 +596,6 @@ document.getElementById('btn-checkout').addEventListener('click', () => {
     document.getElementById('cash-change').innerText = '₹0.00';
     payModal.show();
 });
-    document.getElementById('cash-received').value = currentFinalAmount.toFixed(2);
-    document.getElementById('cash-change').innerText = '₹0.00';
-    payModal.show();
-});
 
 document.getElementById('cash-received').addEventListener('input', function() {
     const rec = parseFloat(this.value) || 0;
@@ -736,7 +732,6 @@ function openCameraScanner() {
     if (modal) {
         modal.show();
     }
-    startCameraScanner();
 }
 
 function restartCamera() {
@@ -746,8 +741,10 @@ function restartCamera() {
         statusEl.className = 'mt-2 fs-sm text-primary';
         statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Restarting camera...';
     }
-    setTimeout(startCameraScanner, 250);
+    setTimeout(startCameraScanner, 300);
 }
+
+let nativeFailStreak = 0;
 
 async function startCameraScanner() {
     const statusEl = document.getElementById('camera-scan-status');
@@ -755,91 +752,129 @@ async function startCameraScanner() {
     if (!statusEl || !video) return;
 
     statusEl.className = 'mt-2 fs-sm text-primary';
-    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Starting camera...';
+    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Initializing camera...';
 
     // Verify browser support for media devices
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         statusEl.className = 'mt-2 fs-sm text-danger';
-        statusEl.innerHTML = '<i class="bi bi-shield-slash-fill text-danger"></i> Camera requires a secure connection (<b>https://</b> or <b>localhost</b>).';
+        statusEl.innerHTML = '<i class="bi bi-shield-slash-fill text-danger me-1"></i> Camera requires a secure connection (<b>https://</b> or <b>localhost</b>).<br><small class="text-muted">You can also use "Snap Photo / Upload" below.</small>';
         return;
     }
 
     try {
         stopCameraScanner();
 
-        // 1. Request camera stream (try back-camera first, then fallback to any camera)
+        // 1. Request camera stream (try back-camera first with HD constraints, then fallback to any camera)
         let stream = null;
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: currentCameraDeviceId 
-                    ? { deviceId: { exact: currentCameraDeviceId } }
-                    : { facingMode: { ideal: 'environment' } }
-            });
-        } catch (e1) {
-            console.warn('Constrained camera request failed, trying simple { video: true } fallback:', e1);
-            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const attempts = [
+            currentCameraDeviceId
+                ? { video: { deviceId: { exact: currentCameraDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+                : { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+            { video: { facingMode: 'environment' } },
+            { video: true }
+        ];
+
+        for (const constraint of attempts) {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraint);
+                if (stream) break;
+            } catch (err) {
+                console.warn('Camera constraint attempt failed:', err.name);
+            }
+        }
+
+        if (!stream) {
+            throw new Error('Unable to access camera on this device.');
         }
 
         cameraStream = stream;
         video.srcObject = stream;
         video.setAttribute('playsinline', 'true');
-        video.setAttribute('autoplay', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
         video.muted = true;
+
+        // Try continuous autofocus on devices supporting it
+        try {
+            const track = stream.getVideoTracks()[0];
+            if (track && track.getCapabilities) {
+                const caps = track.getCapabilities();
+                if (caps.focusMode && caps.focusMode.includes('continuous')) {
+                    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+                }
+            }
+        } catch (e) {}
+
         await video.play();
 
         isCameraRunning = true;
         statusEl.className = 'mt-2 fs-sm text-success';
-        statusEl.innerHTML = '<i class="bi bi-camera-video-fill"></i> Camera active. Aim at any barcode.';
+        statusEl.innerHTML = '<i class="bi bi-camera-video-fill me-1"></i> Camera active. Center barcode inside the green frame.';
 
         // Populate available cameras dropdown
         populateCameraDevices();
 
-        // 2. High-performance native BarcodeDetector API (built-in on Chrome/Edge/Android)
-        if ('BarcodeDetector' in window) {
-            try {
-                const supportedFormats = await BarcodeDetector.getSupportedFormats().catch(() => []);
-                nativeDetector = new BarcodeDetector({
-                    formats: supportedFormats.length ? supportedFormats : ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code']
-                });
-                startNativeScanLoop(video, statusEl);
-                return;
-            } catch (err) {
-                console.warn('Native BarcodeDetector init failed, using ZXing:', err);
-                nativeDetector = null;
-            }
-        }
-
-        // 3. Fallback to ZXing library decoding directly from the playing video element
-        startZXingScanner(video, statusEl);
+        // 2. Start Dual Scan Engine: Hardware-accelerated BarcodeDetector with immediate ZXing fallback
+        startDualScanEngine(video, statusEl);
 
     } catch (err) {
         console.error('Camera access error:', err);
         statusEl.className = 'mt-2 fs-sm text-danger';
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-            statusEl.innerHTML = '<i class="bi bi-shield-lock-fill"></i> <b>Camera access blocked.</b><br>Please click the camera/lock icon in your browser address bar and select <b>"Allow"</b>.';
+            statusEl.innerHTML = '<i class="bi bi-shield-lock-fill me-1"></i> <b>Camera access blocked.</b><br>Please click the camera/lock icon in your browser address bar and select <b>"Allow"</b>, then tap Restart Camera.';
         } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-            statusEl.innerHTML = '<i class="bi bi-camera-video-off"></i> No camera hardware detected on this device.';
+            statusEl.innerHTML = '<i class="bi bi-camera-video-off me-1"></i> No camera hardware detected on this device.';
         } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-            statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Camera is in use by another app (Zoom, Teams, Camera app). Please close other apps and click "Restart Camera".';
+            statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill me-1"></i> Camera is in use by another app. Please close other apps and click "Restart Camera".';
         } else {
-            statusEl.innerText = 'Camera error: ' + (err.message || err.name || err);
+            statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-danger me-1"></i> ' + (err.message || err.name || err);
         }
     }
+}
+
+async function startDualScanEngine(video, statusEl) {
+    // 1. High-performance native BarcodeDetector API (built-in on Chrome/Edge/Android)
+    if ('BarcodeDetector' in window) {
+        try {
+            const supportedFormats = await BarcodeDetector.getSupportedFormats().catch(() => []);
+            const desired = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'];
+            const usable = desired.filter(f => supportedFormats.includes(f));
+            if (usable.length > 0) {
+                nativeDetector = new BarcodeDetector({ formats: usable });
+                nativeFailStreak = 0;
+                startNativeScanLoop(video, statusEl);
+                return;
+            }
+        } catch (err) {
+            console.warn('Native BarcodeDetector init failed, using ZXing:', err);
+            nativeDetector = null;
+        }
+    }
+
+    // 2. Direct fallback to ZXing library
+    startZXingScanner(video, statusEl);
 }
 
 function startNativeScanLoop(video, statusEl) {
     async function scanFrame() {
         if (!isCameraRunning || !cameraStream) return;
 
-        if (video.readyState >= 2) {
+        if (video.readyState >= 2 && video.videoWidth > 0) {
             try {
                 const barcodes = await nativeDetector.detect(video);
+                nativeFailStreak = 0;
                 if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
                     onBarcodeDetected(barcodes[0].rawValue, statusEl);
                     return;
                 }
             } catch (e) {
-                // Frame detection pass error, ignore and continue
+                nativeFailStreak++;
+                // If native detection fails consecutively (e.g. Google Play Services missing on Android)
+                if (nativeFailStreak >= 4) {
+                    console.warn('Native BarcodeDetector service unavailable, switching to ZXing:', e);
+                    nativeDetector = null;
+                    startZXingScanner(video, statusEl);
+                    return;
+                }
             }
         }
 
@@ -884,7 +919,7 @@ function runZXing(video, statusEl) {
         });
     } catch (e) {
         statusEl.className = 'mt-2 fs-sm text-danger';
-        statusEl.innerText = 'ZXing error: ' + (e.message || e);
+        statusEl.innerText = 'Scanner error: ' + (e.message || e);
     }
 }
 
@@ -950,26 +985,33 @@ async function handleBarcodeImageFile(input) {
 }
 
 function onBarcodeDetected(code, statusEl) {
+    if (!code) return;
+    const cleanCode = code.trim();
     const now = Date.now();
-    if (code === lastScannedCode && (now - lastScannedTime) < 1500) {
+    if (cleanCode === lastScannedCode && (now - lastScannedTime) < 1500) {
         return;
     }
-    lastScannedCode = code;
+    lastScannedCode = cleanCode;
     lastScannedTime = now;
 
     // Audible confirmation beep
     playScanBeep();
+    if (navigator.vibrate) {
+        try { navigator.vibrate([100]); } catch (e) {}
+    }
 
-    statusEl.className = 'mt-2 fs-sm text-success fw-bold';
-    statusEl.innerHTML = `<i class="bi bi-check-circle-fill"></i> Scanned: <b>${code}</b>! Adding to bill...`;
+    if (statusEl) {
+        statusEl.className = 'mt-2 fs-sm text-success fw-bold';
+        statusEl.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> Scanned: <b>${cleanCode}</b>! Adding to bill...`;
+    }
 
-    lookupBarcode(code);
+    lookupBarcode(cleanCode);
 
     setTimeout(() => {
         const modal = getCameraModal();
         if (modal) modal.hide();
         stopCameraScanner();
-    }, 400);
+    }, 450);
 }
 
 function switchCamera(deviceId) {
@@ -985,6 +1027,7 @@ function stopCameraScanner() {
     }
     if (codeReader) {
         try { codeReader.reset(); } catch (e) {}
+        codeReader = null;
     }
     if (cameraStream) {
         cameraStream.getTracks().forEach(track => {
@@ -994,6 +1037,7 @@ function stopCameraScanner() {
     }
     const video = document.getElementById('camera-preview');
     if (video) {
+        try { video.pause(); } catch (e) {}
         video.srcObject = null;
     }
 }
@@ -1065,11 +1109,25 @@ document.getElementById('modal-search-box').addEventListener('input', function()
     });
 });
 
+// Camera Modal Lifecycle Events: start camera only after modal is rendered, cleanly stop on any close
+const camModalElement = document.getElementById('cameraModal');
+if (camModalElement) {
+    camModalElement.addEventListener('shown.bs.modal', function () {
+        startCameraScanner();
+    });
+    camModalElement.addEventListener('hidden.bs.modal', function () {
+        stopCameraScanner();
+    });
+}
+
 // Shortcuts
 document.addEventListener('keydown', (e) => {
     if (e.key === 'F2') {
         e.preventDefault();
         barcodeInput.focus();
+    } else if (e.key === 'F3') {
+        e.preventDefault();
+        openCameraScanner();
     } else if (e.key === 'F4') {
         e.preventDefault();
         document.getElementById('btn-search-modal').click();

@@ -1186,8 +1186,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const modalEl = document.getElementById('productCameraModal');
         const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
         modal.show();
-        window.startProductCameraScanner();
     });
+
+    // Lifecycle events for Product Camera Modal
+    const prodCamModalEl = document.getElementById('productCameraModal');
+    if (prodCamModalEl) {
+        prodCamModalEl.addEventListener('shown.bs.modal', function () {
+            window.startProductCameraScanner();
+        });
+        prodCamModalEl.addEventListener('hidden.bs.modal', function () {
+            window.stopProductCameraScanner();
+        });
+    }
 
     // ==========================================
     // Camera Barcode Scanner Logic for Product Form
@@ -1197,6 +1207,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let productCodeReader = null;
     let productScanAnimationId = null;
     let currentProductCameraId = null;
+    let productNativeFailStreak = 0;
 
     window.startProductCameraScanner = async function() {
         const statusEl = document.getElementById('product-camera-status');
@@ -1218,21 +1229,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 productCameraStream = null;
             }
 
-            const constraints = {
-                video: currentProductCameraId
-                    ? { deviceId: { exact: currentProductCameraId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-                    : { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-            };
+            const attempts = [
+                currentProductCameraId
+                    ? { video: { deviceId: { exact: currentProductCameraId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+                    : { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+                { video: { facingMode: 'environment' } },
+                { video: true }
+            ];
 
-            let stream;
-            try {
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-            } catch (err) {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            let stream = null;
+            for (const constraint of attempts) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia(constraint);
+                    if (stream) break;
+                } catch (err) {}
             }
+
+            if (!stream) throw new Error('No camera stream accessible');
 
             productCameraStream = stream;
             video.srcObject = stream;
+            video.setAttribute('playsinline', 'true');
+            video.setAttribute('webkit-playsinline', 'true');
+            video.muted = true;
+
+            try {
+                const track = stream.getVideoTracks()[0];
+                if (track && track.getCapabilities) {
+                    const caps = track.getCapabilities();
+                    if (caps.focusMode && caps.focusMode.includes('continuous')) {
+                        track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+                    }
+                }
+            } catch (e) {}
+
             await video.play();
 
             isProductCameraRunning = true;
@@ -1245,11 +1275,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if ('BarcodeDetector' in window) {
                 try {
                     const supported = await BarcodeDetector.getSupportedFormats().catch(() => []);
-                    const nativeDetector = new BarcodeDetector({
-                        formats: supported.length ? supported : ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e']
-                    });
-                    startProductNativeScanLoop(video, statusEl, nativeDetector);
-                    return;
+                    const desired = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e'];
+                    const usable = desired.filter(f => supported.includes(f));
+                    if (usable.length > 0) {
+                        const nativeDetector = new BarcodeDetector({ formats: usable });
+                        productNativeFailStreak = 0;
+                        startProductNativeScanLoop(video, statusEl, nativeDetector);
+                        return;
+                    }
                 } catch (e) {
                     console.warn('Native BarcodeDetector failed, falling back to ZXing', e);
                 }
@@ -1273,14 +1306,22 @@ document.addEventListener('DOMContentLoaded', function() {
     function startProductNativeScanLoop(video, statusEl, detector) {
         async function step() {
             if (!isProductCameraRunning) return;
-            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) {
                 try {
                     const barcodes = await detector.detect(video);
+                    productNativeFailStreak = 0;
                     if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
                         onProductBarcodeDetected(barcodes[0].rawValue, statusEl);
                         return;
                     }
-                } catch (e) {}
+                } catch (e) {
+                    productNativeFailStreak++;
+                    if (productNativeFailStreak >= 4) {
+                        console.warn('Product native detector failing, switching to ZXing:', e);
+                        startProductZXingScanner(video, statusEl);
+                        return;
+                    }
+                }
             }
             productScanAnimationId = requestAnimationFrame(step);
         }
